@@ -4573,6 +4573,26 @@ function findSheetDevice(id) {
   return null;
 }
 
+function propertyArcDevice() {
+  return (state.devices || []).find((d) => d.kind === "arc") || null;
+}
+
+function floorRoomForDevice(d) {
+  let selectedFloor = state.selectedFloor;
+  let selectedRoom = state.selectedRoom;
+  const dest = String(d?.room || "").trim();
+  if (!dest) return { selectedFloor, selectedRoom };
+  (state.floors || []).forEach((f, fi) => {
+    (f.rooms || []).forEach((r, ri) => {
+      if (roomName(r) === dest) {
+        selectedFloor = fi;
+        selectedRoom = ri;
+      }
+    });
+  });
+  return { selectedFloor, selectedRoom };
+}
+
 function sheetRoomNames() {
   return (state.floors || []).flatMap((f) => (f.rooms || []).map(roomName));
 }
@@ -6440,6 +6460,10 @@ function propertyCard() {
               <button type="button" class="prop-hero__profiles" data-action="view-scenes" data-coach="scenes" aria-label="View scenes">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor"/></svg>
                 Scenes
+              </button>
+              <button type="button" class="prop-hero__profiles" data-action="view-jemm-arc" aria-label="View Jemm Arc">
+                <img src="assets/icon-arc.svg" alt="" />
+                View Jemm Arc
               </button>
               <button type="button" class="prop-hero__edit" data-action="edit-property" aria-label="Edit property details">
                 <img src="assets/icon-pencil.svg" alt="" />
@@ -8372,6 +8396,28 @@ document.addEventListener("click", (e) => {
     const scenes = ensurePropertyScenes();
     const current = findScene(state.selectedScene);
     setState({ modal: "scene", selectedScene: current?.id || scenes[0]?.id || null, scenes });
+    return;
+  }
+  if (act === "view-jemm-arc") {
+    const arc = propertyArcDevice();
+    if (!arc) {
+      flashToast("No Jemm Arc", "Pair a Jemm Arc to this property to open its details.");
+      return;
+    }
+    if (String(state.selectedDevice) === String(arc.id)) return;
+    const loc = floorRoomForDevice(arc);
+    setState({
+      selectedDevice: arc.id,
+      deviceSnapshot: structuredClone(deviceView(arc)),
+      modal: null,
+      roomsMenu: false,
+      floorOverview: false,
+      selectedFloor: loc.selectedFloor,
+      selectedRoom: loc.selectedRoom,
+      sheetAccord: { test: true, hardware: true, network: true },
+      jemmSideOpen: false,
+      ...patchForSheetNav(true),
+    });
     return;
   }
   if (act === "save-scene-template") {
