@@ -380,9 +380,9 @@ const COACH = {
   },
   scenes: {
     title: "Scenes live here",
-    text: "Open Scenes when you’re ready. Each one is a preset — tap it to see what changes, then run it. You don’t need to create scenes while setting up a property.",
+    text: "Open Scenes next to Profiles when you’re ready. Each one is a preset — tap it to see what changes, then run it. You don’t need to create scenes while setting up a property.",
     cta: "Got it",
-    strip: "Hey, Jemm here. Scenes are presets you can run later — open the row when you need them.",
+    strip: "Hey, Jemm here. Scenes are presets you can run later — open Scenes in the header when you need them.",
   },
 };
 
@@ -486,7 +486,7 @@ function applyPropertyType(value) {
 
 function iconForKind(kind) {
   if (kind === "arc") return "assets/icon-arc.svg";
-  if (kind === "mic") return "assets/devices/hero-mic.svg";
+  if (kind === "mic") return "assets/devices/icon-mic.svg";
   if (kind === "remote") return "assets/devices/hero-remote.png";
   if (kind === "light") return "assets/devices/icon-light.svg";
   if (kind === "audio") return "assets/devices/icon-audio.svg";
@@ -517,7 +517,8 @@ function kindIconHtml(src, extra = "") {
   if (src === "kind:display") {
     return `<span class="device-kind-icon device-kind-icon--display${extra ? ` ${extra}` : ""}" aria-hidden="true"><span class="tv-glyph"></span></span>`;
   }
-  return `<span class="device-kind-icon${extra ? ` ${extra}` : ""}"><img src="${esc(src)}" alt="" /></span>`;
+  const mic = src && src.includes("icon-mic") ? " device-kind-icon--mic" : "";
+  return `<span class="device-kind-icon${mic}${extra ? ` ${extra}` : ""}"><img src="${esc(src)}" alt="" /></span>`;
 }
 
 function isGlyphKind(kind) {
@@ -631,6 +632,7 @@ function blankState() {
     uploadPct: 0,
     arcStatus: "offline",
     selectedFloor: 0,
+    floorOverview: false,
     selectedRoom: 0,
     hereFloor: 0,
     hereRoom: 0,
@@ -688,6 +690,7 @@ function blankState() {
     crumbSource: null,
     homeView: "list",
     homeFilter: "all",
+    homeUpdated: "all",
     portalMode: loadMode(),
     propertyView: "rooms",
     selectedScene: null,
@@ -704,8 +707,11 @@ function blankState() {
     clientsView: "table",
     clientQuery: "",
     clientFilter: "all",
+    clientUpdated: "all",
     selectedProperties: [],
     clientsOpen: null,
+    roomsFilter: "all",
+    tableFilter: null,
     clientsMenu: false,
     salesChart: "cumulative",
     salesSku: "arc",
@@ -722,6 +728,7 @@ function blankState() {
     jemmNotice: null,
     jemmNoticeNext: null,
     sidebarOpen: true,
+    restoreSidebar: false,
     formTouched: {},
     theme: loadTheme(),
     coach: null,
@@ -1057,7 +1064,7 @@ function go(screen) {
   clearTimers();
   const from = state.screen;
   if (screen !== from) resetJemmSpeech();
-  const patch = { screen, modal: null, selectedDevice: null, previewProperty: null };
+  const patch = { screen, modal: null, selectedDevice: null, previewProperty: null, ...patchForSheetNav(false) };
   const propertyScreens = ["property", "arc", "rooms", "devices"];
   if (!propertyScreens.includes(screen)) patch.crumbSource = null;
   else if (from === "clients") patch.crumbSource = "clients";
@@ -1993,6 +2000,13 @@ function roomRowNameHtml(i, label) {
 }
 
 function roomsPlanTitleHtml(room, floor) {
+  if (state.floorOverview) {
+    return `
+      <div class="rooms-plan__title-block">
+        <h2 class="rooms-plan__title">${esc(floor.name || "Floorplan")}</h2>
+        <p class="rooms-plan__hint">Click a room to focus it</p>
+      </div>`;
+  }
   if (!room) return `<h2>${esc(floor.name || "Floorplan")}</h2>`;
   const i = state.selectedRoom;
   const selected = roomName(room);
@@ -2192,6 +2206,118 @@ function plusBtn(action, label, attrs = "") {
   return `<button type="button" class="plus-btn" data-action="${esc(action)}" aria-label="${esc(label)}" ${attrs}>+</button>`;
 }
 
+function checkIsRecent(text) {
+  const m = String(text || "").match(/(\d+)\s*min/i);
+  if (m) return Number(m[1]) <= 10;
+  return /just now|sec/i.test(String(text || ""));
+}
+
+function roomPassesFilter(r) {
+  const f = state.roomsFilter || "all";
+  if (f === "all") return true;
+  const health = roomHealth(roomName(r));
+  if (f === "ok") return health.level === "ok";
+  if (f === "alert") return health.level === "alert";
+  if (f === "empty") return health.level === "quiet";
+  return true;
+}
+
+function tableFilterActive(scope) {
+  if (scope === "rooms") return (state.roomsFilter || "all") !== "all";
+  if (scope === "home") return (state.homeFilter || "all") !== "all" || (state.homeUpdated || "all") !== "all";
+  if (scope === "clients") return (state.clientFilter || "all") !== "all" || (state.clientUpdated || "all") !== "all";
+  return false;
+}
+
+function tableFilterGroups(scope) {
+  if (scope === "rooms") {
+    const cur = state.roomsFilter || "all";
+    return [{
+      field: "status",
+      label: "Status",
+      options: [
+        { value: "all", label: "All rooms", on: cur === "all" },
+        { value: "ok", label: "Healthy", on: cur === "ok" },
+        { value: "alert", label: "Needs attention", on: cur === "alert" },
+        { value: "empty", label: "No devices", on: cur === "empty" },
+      ],
+    }];
+  }
+  if (scope === "home") {
+    const status = state.homeFilter || "all";
+    const updated = state.homeUpdated || "all";
+    return [
+      {
+        field: "status",
+        label: "Status",
+        options: [
+          { value: "all", label: "All properties", on: status === "all" },
+          { value: "active", label: "Active", on: status === "active" },
+          { value: "inactive", label: "Inactive", on: status === "inactive" },
+          { value: "alert", label: "Needs attention", on: status === "alert" },
+          { value: "pending", label: "Pending setup", on: status === "pending" },
+        ],
+      },
+      {
+        field: "updated",
+        label: "Last check",
+        options: [
+          { value: "all", label: "Any time", on: updated === "all" },
+          { value: "recent", label: "Last 10 minutes", on: updated === "recent" },
+          { value: "stale", label: "Older", on: updated === "stale" },
+        ],
+      },
+    ];
+  }
+  const status = state.clientFilter || "all";
+  const updated = state.clientUpdated || "all";
+  return [
+    {
+      field: "status",
+      label: "Status",
+      options: [
+        { value: "all", label: "All clients", on: status === "all" },
+        { value: "active", label: "Active", on: status === "active" },
+        { value: "inactive", label: "Inactive", on: status === "inactive" },
+        { value: "alert", label: "Needs attention", on: status === "alert" },
+      ],
+    },
+    {
+      field: "updated",
+      label: "Last check",
+      options: [
+        { value: "all", label: "Any time", on: updated === "all" },
+        { value: "recent", label: "Last 10 minutes", on: updated === "recent" },
+        { value: "stale", label: "Older", on: updated === "stale" },
+      ],
+    },
+  ];
+}
+
+function tableFilterMenu(scope) {
+  return `
+    <div class="filter-menu" role="menu">
+      ${tableFilterGroups(scope).map((group) => `
+        <p class="filter-menu__label">${esc(group.label)}</p>
+        ${group.options.map((opt) => `
+          <button type="button" role="menuitem" class="${opt.on ? "is-on" : ""}" data-action="set-table-filter" data-scope="${esc(scope)}" data-field="${esc(group.field)}" data-value="${esc(opt.value)}">${esc(opt.label)}</button>
+        `).join("")}
+      `).join("")}
+    </div>`;
+}
+
+function tableFilterBtn(scope) {
+  const open = state.tableFilter === scope;
+  const on = tableFilterActive(scope);
+  return `
+    <div class="filter-wrap" data-keep-menu>
+      <button type="button" class="rooms-filter ${on ? "is-on" : ""}" data-action="toggle-table-filter" data-scope="${esc(scope)}" aria-haspopup="menu" aria-expanded="${open ? "true" : "false"}" aria-label="Filter">
+        <img src="assets/icon-filter.svg" alt="" />
+      </button>
+      ${open ? tableFilterMenu(scope) : ""}
+    </div>`;
+}
+
 function diagnosticsBtnHtml() {
   const n = alertDevices().length;
   return `
@@ -2212,9 +2338,7 @@ function roomsActionBar() {
           <input placeholder="Search by keyword" value="${esc(state.search)}" data-bind="search" />
           <img src="assets/icon-search.svg" alt="" />
         </label>
-        <button type="button" class="rooms-filter" aria-label="Filter">
-          <img src="assets/icon-filter.svg" alt="" />
-        </button>
+        ${tableFilterBtn("rooms")}
       </div>
       <div class="rooms-toolbar__btns">
         <input id="file-input" type="file" accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg" hidden multiple />
@@ -2240,7 +2364,7 @@ function selectedRoomSet() {
 function visibleRoomIndexes(floor, q = (state.search || "").toLowerCase()) {
   return (floor?.rooms || [])
     .map((r, i) => ({ r, i }))
-    .filter(({ r }) => !q || roomName(r).toLowerCase().includes(q))
+    .filter(({ r }) => (!q || roomName(r).toLowerCase().includes(q)) && roomPassesFilter(r))
     .map(({ i }) => i);
 }
 
@@ -2543,6 +2667,21 @@ function sceneGroupBlocks(primary, scene) {
   }).join("");
 }
 
+function scenePickerHtml(activeId) {
+  const scenes = propertyScenes();
+  return `
+    <nav class="scene-picker" aria-label="Scenes">
+      ${scenes.map((s) => `
+        <button type="button" class="scene-tile ${s.id === activeId ? "is-on" : ""} ${s.on ? "is-live" : ""}" data-action="open-scene" data-id="${esc(s.id)}"${s.id === activeId ? ` aria-current="true"` : ""}>
+          <img src="${esc(s.photo || SCENE_PHOTO)}" alt="" />
+          <span>${esc(s.name)}</span>
+        </button>`).join("")}
+      <button type="button" class="scene-tile scene-tile--add" data-action="open-scene-templates">
+        <span>+ From template</span>
+      </button>
+    </nav>`;
+}
+
 function sceneModal() {
   const scene = findScene(state.selectedScene);
   if (!scene) return "";
@@ -2567,6 +2706,8 @@ function sceneModal() {
             <button type="button" class="modal__x" data-action="close-modal" aria-label="Close">×</button>
           </div>
         </div>
+        <div class="modal--scene__layout">
+        ${scenePickerHtml(scene.id)}
         <div class="modal--scene__split">
           <div class="scene-sum--col">
             <div class="scene-sum__hero">
@@ -2594,6 +2735,7 @@ function sceneModal() {
             <p>Solid items are in the scene. Blue outlines share a room but are not in the recipe.</p>
             <div class="scene-chart__frame">${sceneChartSvg(scene, members)}</div>
           </aside>
+        </div>
         </div>
         <div class="modal__cta">
           <button type="button" class="btn btn--secondary" data-action="save-scene-template" data-id="${esc(scene.id)}">Save as template</button>
@@ -2830,16 +2972,32 @@ function planHereMarker(floor, floorIdx = state.selectedFloor) {
   return `<div class="plan-here" style="left:${pos.x}%;top:${pos.y}%">${hereMark(label)}</div>`;
 }
 
+function planRoomChipsHtml(floor) {
+  return (floor?.rooms || []).map((r, i) => {
+    const label = roomName(r);
+    const pos = planRoomPos(label);
+    const health = roomHealth(label);
+    const n = devicesInRoom(label).length;
+    return `
+      <button type="button" class="plan-room-chip ${health.level === "alert" ? "is-alert" : ""}" style="left:${pos.x}%;top:${pos.y}%" data-action="select-room" data-index="${i}" data-drop-room="${esc(label)}">
+        <strong>${esc(label)}</strong>
+        <span>${n} device${n === 1 ? "" : "s"}</span>
+      </button>`;
+  }).join("");
+}
+
 function planOverlayHtml(floor, selected = "", floorIdx = state.selectedFloor) {
   const pins = devicesOnFloor(floor);
   const byRoom = {};
   pins.forEach((d) => { (byRoom[d.room] ||= []).push(d); });
   const is3d = state.planView !== "2d";
   const src = floorPlanSrc(floor, is3d);
+  const overview = !!state.floorOverview;
   return `
-    <div class="plan-stage__map">
+    <div class="plan-stage__map ${overview ? "is-overview" : ""}">
       <img class="plan-stage__img${is3d ? " plan-stage__img--cutaway" : ""}" src="${esc(src)}" alt="${esc(floor.name || "Floorplan")}" />
-      ${pins.map((d) => {
+      ${overview ? `<div class="plan-room-chips">${planRoomChipsHtml(floor)}</div>` : ""}
+      ${overview ? "" : pins.map((d) => {
         const pos = devicePlanPos(d, byRoom[d.room] || [d]);
         return devicePinButton(d, pos, false, `${d.name} · ${d.room}`);
       }).join("")}
@@ -2904,7 +3062,7 @@ function roomsColumnsBoard(floor, room, q) {
           <div class="room-scroll">
             ${floor.rooms
               .map((r, i) => ({ r, i }))
-              .filter(({ r }) => !q || roomName(r).toLowerCase().includes(q))
+              .filter(({ r }) => (!q || roomName(r).toLowerCase().includes(q)) && roomPassesFilter(r))
               .map(({ r, i }) => `
                 <div class="room-row ${i === state.selectedRoom ? "is-on" : ""} ${state.roomMenu === i ? "is-menu" : ""}" data-action="select-room" data-index="${i}">
                   <div class="room-row__field">
@@ -2924,7 +3082,7 @@ function roomsTableBoard(floor, room, q) {
   const peek = !!state.tablePeek && !!room;
   const rows = floor.rooms
     .map((r, i) => ({ r, i }))
-    .filter(({ r }) => !q || roomName(r).toLowerCase().includes(q));
+    .filter(({ r }) => (!q || roomName(r).toLowerCase().includes(q)) && roomPassesFilter(r));
   return `
     <div class="rooms-board rooms-board--table ${peek ? "has-peek" : ""}">
       <div class="rooms-board__nav">
@@ -3163,7 +3321,6 @@ function roomsFloorplan(floor, room) {
   const head = `
       <div class="rooms-plan__head">
         ${roomsPlanTitleHtml(room, floor)}
-        ${weatherChipHtml()}
       </div>`;
   if (!floorHasPlan(floor)) {
     return `
@@ -3203,36 +3360,14 @@ function roomsSidePanel(floor, room) {
     </aside>`;
 }
 
-function roomsScenesStrip() {
-  if (!state.reviewing || state.addingProperty) return "";
-  const scenes = propertyScenes();
-  const open = !!state.scenesOpen;
-  return `
-    <div class="rooms-scenes ${open ? "is-open" : ""}">
-      <button type="button" class="rooms-scenes__toggle" data-action="toggle-scenes" data-coach="scenes" aria-expanded="${open}">
-        <h3>Scenes (${scenes.length})</h3>
-        <span class="rooms-scenes__chev" aria-hidden="true"></span>
-      </button>
-      ${open ? `
-      <div class="rooms-scenes__row">
-        ${scenes.map((s) => `
-          <button type="button" class="scene-tile ${s.on ? "is-on" : ""}" data-action="open-scene" data-id="${esc(s.id)}">
-            <img src="${esc(s.photo || SCENE_PHOTO)}" alt="" />
-            <span>${esc(s.name)}</span>
-          </button>`).join("")}
-        <button type="button" class="scene-tile scene-tile--add" data-action="open-scene-templates">
-          <span>+ From template</span>
-        </button>
-      </div>` : ""}
-    </div>`;
-}
-
 function roomsListCenter(floor, q) {
-  const rows = floor.rooms
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => !q || roomName(r).toLowerCase().includes(q));
+  const overview = !!state.floorOverview;
+  const rows = (overview
+    ? state.floors.flatMap((f, fi) => (f.rooms || []).map((r, i) => ({ r, i, fi, floorName: f.name })))
+    : floor.rooms.map((r, i) => ({ r, i, fi: state.selectedFloor, floorName: floor.name }))
+  ).filter(({ r }) => (!q || roomName(r).toLowerCase().includes(q)) && roomPassesFilter(r));
   const picked = selectedRoomSet();
-  const visible = rows.map(({ i }) => i);
+  const visible = overview ? [] : rows.map(({ i }) => i);
   const selectedCount = visible.filter((i) => picked.has(i)).length;
   const allOn = visible.length > 0 && selectedCount === visible.length;
   return `
@@ -3240,17 +3375,18 @@ function roomsListCenter(floor, q) {
       <div class="rooms-plan__head">
         <div>
           <h2>Rooms</h2>
-          <p>${floor.rooms.length} on this floor${selectedCount ? ` · ${selectedCount} selected` : ""}</p>
+          <p>${overview ? `${rows.length} across all floors · click a room to focus` : `${floor.rooms.length} on this floor${selectedCount ? ` · ${selectedCount} selected` : ""}`}</p>
         </div>
-        ${plusBtn("add-room", "Add room", `data-coach="add-rooms"`)}
+        ${overview ? "" : plusBtn("add-room", "Add room", `data-coach="add-rooms"`)}
       </div>
       <div class="rooms-table__wrap data-wrap">
         <table class="data-table">
           <thead>
             <tr>
+              ${overview ? "" : `
               <th class="data-table__check">
                 <input class="check" type="checkbox" id="select-all-rooms" data-action="toggle-select-all" aria-label="Select all rooms" ${allOn ? "checked" : ""} />
-              </th>
+              </th>`}
               <th>Name</th>
               <th>Devices</th>
               <th>Status</th>
@@ -3259,42 +3395,44 @@ function roomsListCenter(floor, q) {
             </tr>
           </thead>
           <tbody>
-            ${rows.map(({ r, i }) => {
+            ${rows.map(({ r, i, fi, floorName }) => {
               const label = roomName(r);
               const n = devicesInRoom(label).length;
               const health = roomHealth(label);
-              const on = picked.has(i);
-              const here = i === state.selectedRoom;
+              const on = !overview && picked.has(i);
+              const here = !overview && i === state.selectedRoom;
               return `
-                <tr class="data-table__row ${here ? "is-on" : ""} ${isHereRoom(state.selectedFloor, i) ? "is-here" : ""} ${on ? "is-checked" : ""} ${health.level === "alert" ? "is-alert" : ""} ${state.roomMenu === i ? "is-menu" : ""}" data-action="select-room" data-index="${i}" data-drop-room="${esc(label)}">
+                <tr class="data-table__row ${here ? "is-on" : ""} ${isHereRoom(fi, i) ? "is-here" : ""} ${on ? "is-checked" : ""} ${health.level === "alert" ? "is-alert" : ""} ${state.roomMenu === i && fi === state.selectedFloor ? "is-menu" : ""}" data-action="select-room" data-index="${i}" data-floor="${fi}" data-drop-room="${esc(label)}">
+                  ${overview ? "" : `
                   <td class="data-table__check">
                     <input class="check" type="checkbox" data-action="toggle-room-check" data-index="${i}" ${on ? "checked" : ""} aria-label="Select ${esc(label)}" />
-                  </td>
+                  </td>`}
                   <td>
                     <div class="rooms-table__who">
                       ${tableRoomNameHtml(i, label)}
-                      ${isHereRoom(state.selectedFloor, i) ? hereMark(label) : ""}
+                      ${isHereRoom(fi, i) ? hereMark(label) : ""}
                     </div>
                   </td>
                   <td>${n}</td>
                   <td><span class="status-pill status-pill--${health.level}">${esc(health.label)}</span></td>
-                  <td>${esc(floor.name)}</td>
+                  <td>${esc(floorName)}</td>
                   <td>
-                    ${roomRowMenu(i)}
+                    ${overview ? "" : roomRowMenu(i)}
                   </td>
                 </tr>`;
             }).join("")}
           </tbody>
         </table>
       </div>
-      ${roomSuggestHtml()}
+      ${overview ? "" : roomSuggestHtml()}
     </div>`;
 }
 
 function roomsPlanBoard(floor, room, q) {
   const list = isListLayout();
+  const overview = !!state.floorOverview;
   return `
-    <div class="rooms-board rooms-board--wire ${list ? "rooms-board--list" : ""}">
+    <div class="rooms-board rooms-board--wire ${list ? "rooms-board--list" : ""} ${overview ? "is-overview" : ""}">
       <aside class="floors-rail">
         <div class="floors-rail__head">
           <span class="floors-rail__icon"><img src="assets/rooms/icon-floors-header.svg" alt="" /></span>
@@ -3302,14 +3440,15 @@ function roomsPlanBoard(floor, room, q) {
         </div>
         ${plusBtn("add-floor", "Add floor", `data-coach="add-floors"`)}
         <div class="floors-rail__list">
+          <button type="button" class="floor-pill floor-pill--all ${overview ? "is-on" : ""}" data-action="select-floor-all" title="See the whole floor" aria-pressed="${overview ? "true" : "false"}">All</button>
           ${state.floors.map((f, i) => ({ f, i })).reverse().map(({ i }) => `
-            <button type="button" class="floor-pill ${i === state.selectedFloor ? "is-on" : ""}" data-action="select-floor" data-index="${i}">
+            <button type="button" class="floor-pill ${!overview && i === state.selectedFloor ? "is-on" : ""} ${overview && i === state.selectedFloor ? "is-viewing" : ""}" data-action="select-floor" data-index="${i}">
               ${i + 1}${ordinal(i + 1)}
             </button>
           `).join("")}
         </div>
       </aside>
-      ${list ? "" : `
+      ${list || overview ? "" : `
       <aside class="room-list">
         <div class="col-head">
           <h3>Rooms (${floor.rooms.length})</h3>
@@ -3318,7 +3457,7 @@ function roomsPlanBoard(floor, room, q) {
         <div class="room-scroll">
           ${floor.rooms
             .map((r, i) => ({ r, i }))
-            .filter(({ r }) => !q || roomName(r).toLowerCase().includes(q))
+            .filter(({ r }) => (!q || roomName(r).toLowerCase().includes(q)) && roomPassesFilter(r))
             .map(({ r, i }) => {
               const label = roomName(r);
               const health = roomHealth(label);
@@ -3337,7 +3476,7 @@ function roomsPlanBoard(floor, room, q) {
       <section class="rooms-main">
         ${list ? roomsListCenter(floor, q) : roomsFloorplan(floor, room)}
       </section>
-      ${roomsSidePanel(floor, room)}
+      ${overview ? "" : roomsSidePanel(floor, room)}
     </div>`;
 }
 
@@ -4118,6 +4257,31 @@ function navActive(id) {
 
 function isWizardFlow() {
   return !state.reviewing && (isOnboarding() || state.addingProperty);
+}
+
+function sheetNavIsTight() {
+  return window.matchMedia("(max-width: 1680px)").matches;
+}
+
+function patchForSheetNav(open) {
+  const tight = sheetNavIsTight();
+  if (open && tight && state.sidebarOpen !== false) {
+    return { sidebarOpen: false, restoreSidebar: true };
+  }
+  if (open && !tight && state.restoreSidebar) {
+    return { sidebarOpen: true, restoreSidebar: false };
+  }
+  if (!open && state.restoreSidebar) {
+    return { sidebarOpen: true, restoreSidebar: false };
+  }
+  return {};
+}
+
+function syncSheetNav() {
+  const patch = patchForSheetNav(!!state.selectedDevice);
+  if (!Object.keys(patch).length) return;
+  if (patch.sidebarOpen === state.sidebarOpen && patch.restoreSidebar === state.restoreSidebar) return;
+  setState(patch);
 }
 
 function sidebar() {
@@ -5224,9 +5388,10 @@ function addDeviceModal() {
 function deviceCard(d, view) {
   const on = d.on !== false;
   const alert = deviceIsAlert(d);
+  const selected = String(state.selectedDevice) === String(d.id);
   if (view === "list") {
     return `
-      <button type="button" class="device-row ${alert ? "is-alert" : ""} ${state.flashingDevice === d.id ? "is-flashing" : ""}" data-action="open-device" data-id="${esc(d.id)}">
+      <button type="button" class="device-row ${alert ? "is-alert" : ""} ${selected ? "is-on" : ""} ${state.flashingDevice === d.id ? "is-flashing" : ""}" data-action="open-device" data-id="${esc(d.id)}">
         <span class="device-rail__status ${alert ? "is-alert" : "is-ok"}" aria-hidden="true"></span>
         ${kindIconHtml(deviceIcon(d), "device-row__icon")}
         <span class="device-row__copy">
@@ -5237,7 +5402,7 @@ function deviceCard(d, view) {
       </button>`;
   }
   return `
-    <button type="button" class="device-tile" data-action="open-device" data-id="${esc(d.id)}">
+    <button type="button" class="device-tile ${selected ? "is-on" : ""} ${state.flashingDevice === d.id ? "is-flashing" : ""}" data-action="open-device" data-id="${esc(d.id)}">
       <strong>${esc(d.name)}</strong>
       ${kindIconHtml(deviceIcon(d))}
       <span>${esc(d.room)} · ${esc(isMediaDevice(d) ? mediaStatusLine(d) : (on ? "On" : "Off"))}</span>
@@ -5453,7 +5618,7 @@ function deviceSheetDirty() {
 }
 
 function closeDeviceSheet() {
-  const patch = { selectedDevice: null, deviceSnapshot: null, flashingDevice: null };
+  const patch = { selectedDevice: null, deviceSnapshot: null, flashingDevice: null, ...patchForSheetNav(false) };
   if (deviceSheetDirty() && state.selectedDevice) {
     const restored = mutateDevice(state.selectedDevice, state.deviceSnapshot);
     setState({ ...restored, ...patch });
@@ -6272,6 +6437,10 @@ function propertyCard() {
                 <img src="assets/icon-fingerprint.svg" alt="" />
                 Profiles
               </button>
+              <button type="button" class="prop-hero__profiles" data-action="view-scenes" data-coach="scenes" aria-label="View scenes">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor"/></svg>
+                Scenes
+              </button>
               <button type="button" class="prop-hero__edit" data-action="edit-property" aria-label="Edit property details">
                 <img src="assets/icon-pencil.svg" alt="" />
               </button>
@@ -6442,10 +6611,6 @@ function propertyViewTabs() {
     </div>`;
 }
 
-function propertyScenesView() {
-  return roomsScenesStrip();
-}
-
 function propertyDevicesView() {
   const groups = groupDeviceList(state.devices);
   if (!groups.length) return `<p class="muted-note">No devices in this property yet.</p>`;
@@ -6464,7 +6629,6 @@ function rooms() {
       ${kicker(title)}
       <div class="wizard__body wizard__body--fill wizard__body--rooms">
         ${propertyCard()}
-        ${roomsScenesStrip()}
         <div class="rooms-pin">
           ${roomsActionBar()}
           ${has ? roomsWorkspace(floor, room, q) : roomsEmptyHtml()}
@@ -6512,7 +6676,6 @@ function dashboard() {
   const mode = currentMode();
   const all = modeProperties();
   const q = state.navSearch.trim().toLowerCase();
-  const filter = state.homeFilter || "all";
   const lives = all.filter((p) => {
     if (!q) return true;
     const det = p.details || {};
@@ -6524,7 +6687,18 @@ function dashboard() {
   const alerts = liveAlerts();
   const offline = all.filter((p) => !isPendingSetup(p) && (p.arcStatus || "offline") !== "online");
   const health = lives.map(liveHealth);
-  const shown = filter === "alert" ? health.filter((h) => h.level !== "ok") : health;
+  const shown = health.filter((h) => {
+    const p = lives.find((x) => x.id === h.id);
+    const status = state.homeFilter || "all";
+    const updated = state.homeUpdated || "all";
+    if (status === "active" && (h.pending || h.arc !== "online")) return false;
+    if (status === "inactive" && !(h.pending || h.arc !== "online")) return false;
+    if (status === "alert" && h.level === "ok") return false;
+    if (status === "pending" && !h.pending) return false;
+    if (updated === "recent" && !checkIsRecent(p?.lastCheck)) return false;
+    if (updated === "stale" && checkIsRecent(p?.lastCheck)) return false;
+    return true;
+  });
   const notes = all.filter((p) => p.note && !isPendingSetup(p));
   const count = all.length;
   const pending = pendingProperties();
@@ -6682,10 +6856,7 @@ function dashboard() {
         <section class="dash-panel" id="dash-properties">
           <div class="dash-panel__head">
             <h2>Properties</h2>
-            <div class="seg seg--sm">
-              <button type="button" class="${filter === "all" ? "is-on" : ""}" data-action="home-filter" data-value="all">All</button>
-              <button type="button" class="${filter === "alert" ? "is-on" : ""}" data-action="home-filter" data-value="alert">Alerts</button>
-            </div>
+            ${tableFilterBtn("home")}
           </div>
           ${shown.length ? `
             <div class="data-wrap">
@@ -7046,10 +7217,16 @@ function clientPortfolio() {
 function filteredClientRows() {
   const q = (state.clientQuery || "").toLowerCase();
   const filter = state.clientFilter || "all";
+  const updated = state.clientUpdated || "all";
   return clientPortfolio().filter((c) => {
     const blob = [c.name, c.email, c.phone, ...c.properties.map((p) => `${p.name} ${p.note} ${p.loc} ${p.address}`)].join(" ").toLowerCase();
     if (q && !blob.includes(q)) return false;
+    const active = c.properties.some((p) => !p.pending && p.arc === "online");
     if (filter === "alert" && c.level === "ok") return false;
+    if (filter === "active" && !active) return false;
+    if (filter === "inactive" && active && c.level === "ok") return false;
+    if (updated === "recent" && !checkIsRecent(c.lastCheck)) return false;
+    if (updated === "stale" && checkIsRecent(c.lastCheck)) return false;
     return true;
   });
 }
@@ -7295,7 +7472,6 @@ function clientsKpis(rows) {
 
 function clientsToolbar(rows) {
   const n = (state.selectedProperties || []).length;
-  const filter = state.clientFilter || "all";
   return `
     <div class="rooms-toolbar clients-toolbar">
       <div class="rooms-toolbar__left">
@@ -7303,9 +7479,7 @@ function clientsToolbar(rows) {
           <input placeholder="Search by keyword" value="${esc(state.clientQuery)}" data-bind="clientQuery" />
           <img src="assets/icon-search.svg" alt="" />
         </label>
-        <button type="button" class="rooms-filter ${filter === "alert" ? "is-on" : ""}" data-action="client-filter" data-value="${filter === "alert" ? "all" : "alert"}" aria-label="Filter needs attention">
-          <img src="assets/icon-filter.svg" alt="" />
-        </button>
+        ${tableFilterBtn("clients")}
       </div>
       <div class="rooms-toolbar__btns">
         ${n ? `
@@ -7318,7 +7492,6 @@ function clientsToolbar(rows) {
           </button>
           ${state.clientsMenu ? `
             <div class="rooms-menu" role="menu">
-              <button type="button" role="menuitem" data-action="client-filter" data-value="${filter === "alert" ? "all" : "alert"}">${filter === "alert" ? "Show all clients" : "Needs attention only"}</button>
               <button type="button" role="menuitem" data-action="clients-view" data-value="${state.clientsView === "grid" ? "table" : "grid"}">${state.clientsView === "grid" ? "View as table" : "View as cards"}</button>
             </div>` : ""}
         </div>
@@ -7711,9 +7884,8 @@ function bindRoomsPin() {
   const pin = scroller?.querySelector(".rooms-pin");
   if (!scroller || !pin) return;
   const hero = scroller.querySelector(".prop-hero");
-  const scenes = scroller.querySelector(".rooms-scenes");
   const update = () => {
-    const above = (hero?.offsetHeight || 0) + (scenes?.offsetHeight || 0);
+    const above = hero?.offsetHeight || 0;
     const hidden = Math.min(Math.max(0, scroller.scrollTop), above);
     const minPin = window.matchMedia("(max-width: 1024px)").matches ? 640 : 160;
     const pinH = Math.max(minPin, Math.round(scroller.clientHeight - above + hidden));
@@ -7729,7 +7901,6 @@ function bindRoomsPin() {
     const ro = new ResizeObserver(update);
     ro.observe(scroller);
     if (hero) ro.observe(hero);
-    if (scenes) ro.observe(scenes);
   }
   update();
 }
@@ -7957,10 +8128,10 @@ document.addEventListener("click", (e) => {
     return;
   }
   const keepMenu = e.target.closest("[data-keep-menu]");
-  if (!keepMenu && (state.propMenu || state.propSwitch || state.notifyOpen || state.roomsMenu || state.clientsMenu || state.jemmMenu || state.roomMenu != null)) {
+  if (!keepMenu && (state.propMenu || state.propSwitch || state.notifyOpen || state.roomsMenu || state.clientsMenu || state.jemmMenu || state.tableFilter || state.roomMenu != null)) {
     const action = e.target.closest("[data-action]");
     if (!action) {
-      setState({ propMenu: false, propSwitch: false, notifyOpen: false, roomsMenu: false, clientsMenu: false, jemmMenu: false, roomMenu: null });
+      setState({ propMenu: false, propSwitch: false, notifyOpen: false, roomsMenu: false, clientsMenu: false, jemmMenu: false, tableFilter: null, roomMenu: null });
       return;
     }
     state.propMenu = false;
@@ -7969,6 +8140,7 @@ document.addEventListener("click", (e) => {
     state.jemmMenu = false;
     if (action.dataset.action !== "toggle-rooms-menu") state.roomsMenu = false;
     if (action.dataset.action !== "toggle-clients-menu") state.clientsMenu = false;
+    if (action.dataset.action !== "toggle-table-filter") state.tableFilter = null;
     if (action.dataset.action !== "toggle-room-menu") state.roomMenu = null;
   }
   if (state.jemmSideOpen && !e.target.closest(".jemm-side")) {
@@ -8039,12 +8211,35 @@ document.addEventListener("click", (e) => {
     }
   }
   if (act === "clients-view") setState({ clientsView: action.dataset.value, clientsMenu: false });
-  if (act === "client-filter") setState({ clientFilter: action.dataset.value, clientsMenu: false });
+  if (act === "toggle-table-filter") {
+    const scope = action.dataset.scope;
+    setState({
+      tableFilter: state.tableFilter === scope ? null : scope,
+      roomsMenu: false,
+      clientsMenu: false,
+      propMenu: false,
+      notifyOpen: false,
+    });
+    return;
+  }
+  if (act === "set-table-filter") {
+    const scope = action.dataset.scope;
+    const field = action.dataset.field;
+    const value = action.dataset.value;
+    const patch = {};
+    if (scope === "rooms") patch.roomsFilter = value;
+    if (scope === "home" && field === "status") patch.homeFilter = value;
+    if (scope === "home" && field === "updated") patch.homeUpdated = value;
+    if (scope === "clients" && field === "status") patch.clientFilter = value;
+    if (scope === "clients" && field === "updated") patch.clientUpdated = value;
+    setState(patch);
+    return;
+  }
   if (act === "sales-chart") setState({ salesChart: action.dataset.value === "segmented" ? "segmented" : "cumulative" });
   if (act === "sales-sku") setState({ salesSku: action.dataset.value });
   if (act === "sales-plan") setState({ salesPlan: action.dataset.value });
   if (act === "toggle-clients-menu") {
-    setState({ clientsMenu: !state.clientsMenu, roomsMenu: false, propMenu: false, notifyOpen: false });
+    setState({ clientsMenu: !state.clientsMenu, roomsMenu: false, tableFilter: null, propMenu: false, notifyOpen: false });
     return;
   }
   if (act === "toggle-client-open") {
@@ -8108,8 +8303,8 @@ document.addEventListener("click", (e) => {
     setState({ jemmVisible: true, jemmDock: false });
     if (state.loggedIn) persistSession();
   }
-  if (act === "collapse-sidebar") setState({ sidebarOpen: false });
-  if (act === "expand-sidebar") setState({ sidebarOpen: true });
+  if (act === "collapse-sidebar") setState({ sidebarOpen: false, restoreSidebar: false });
+  if (act === "expand-sidebar") setState({ sidebarOpen: true, restoreSidebar: false });
   if (act === "set-theme") {
     persistTheme(action.dataset.value);
     setState({ theme: action.dataset.value });
@@ -8173,8 +8368,10 @@ document.addEventListener("click", (e) => {
     setState({ modal: "scene", selectedScene: action.dataset.id, scenes: state.scenes });
     return;
   }
-  if (act === "toggle-scenes") {
-    setState({ scenesOpen: !state.scenesOpen });
+  if (act === "view-scenes") {
+    const scenes = ensurePropertyScenes();
+    const current = findScene(state.selectedScene);
+    setState({ modal: "scene", selectedScene: current?.id || scenes[0]?.id || null, scenes });
     return;
   }
   if (act === "save-scene-template") {
@@ -8434,6 +8631,7 @@ document.addEventListener("click", (e) => {
       roomsMenu: false,
       sheetAccord: { test: true, hardware: true, network: true },
       jemmSideOpen: false,
+      ...patchForSheetNav(true),
     });
     return;
   }
@@ -8673,7 +8871,22 @@ document.addEventListener("click", (e) => {
   }
   if (act === "select-floor") {
     const i = Number(action.dataset.index);
-    setState({ selectedFloor: i, selectedRoom: 0, selectedRooms: [], selectedDevice: null, editingRoom: null });
+    setState({
+      selectedFloor: i,
+      selectedRoom: 0,
+      selectedRooms: [],
+      selectedDevice: null,
+      editingRoom: null,
+      floorOverview: state.floorOverview,
+    });
+    return;
+  }
+  if (act === "select-floor-all") {
+    if (state.floorOverview) {
+      setState({ floorOverview: false });
+      return;
+    }
+    setState({ floorOverview: true, selectedDevice: null, editingRoom: null, roomMenu: null });
     return;
   }
   if (act === "plan-view") {
@@ -8687,10 +8900,20 @@ document.addEventListener("click", (e) => {
       return;
     }
     const i = Number(action.dataset.index);
-    if (i === state.selectedRoom && !e.target.closest("[data-room]") && state.editingRoom == null) return;
+    const floorIdx = action.dataset.floor != null && action.dataset.floor !== ""
+      ? Number(action.dataset.floor)
+      : state.selectedFloor;
+    if (i === state.selectedRoom && floorIdx === state.selectedFloor && !state.floorOverview && !e.target.closest("[data-room]") && state.editingRoom == null) return;
     const input = e.target.closest("[data-room]");
     const caret = input && typeof input.selectionStart === "number" ? input.selectionStart : null;
-    setState({ selectedRoom: i, roomMenu: null, editingRoom: isEditingRoom(i) ? i : null, tablePeek: state.layoutView === "table" ? true : state.tablePeek });
+    setState({
+      selectedFloor: Number.isFinite(floorIdx) ? floorIdx : state.selectedFloor,
+      selectedRoom: i,
+      floorOverview: false,
+      roomMenu: null,
+      editingRoom: isEditingRoom(i) ? i : null,
+      tablePeek: state.layoutView === "table" ? true : state.tablePeek,
+    });
     if (input) {
       requestAnimationFrame(() => {
         const el = document.querySelector(`.room-row [data-room="${i}"]`) || document.querySelector(`[data-room="${i}"]`);
@@ -9034,7 +9257,10 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 
-window.addEventListener("resize", positionCoach);
+window.addEventListener("resize", () => {
+  positionCoach();
+  syncSheetNav();
+});
 document.addEventListener("scroll", positionCoach, true);
 
 (function boot() {
