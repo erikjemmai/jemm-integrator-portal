@@ -1,0 +1,25 @@
+<svg preserveAspectRatio="xMidYMid meet" width="137.999" height="174.688" viewBox="0 0 137.999 174.688" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="JemmArcGlowing" filter="url(#filter0_d_0_10)">
+<rect id="Rectangle 138" x="50" y="50" width="37.9991" height="74.6884" fill="#1A1A1A"/>
+<g id="Logos" clip-path="url(#clip0_0_10)">
+<path id="Vector" d="M72.206 84.2251H65.7892V84.9578H72.206V84.2251Z" fill="#00D58C"/>
+<path id="Vector_2" d="M75.6999 84.204L72.7059 81.042C72.6114 80.942 72.4785 80.8845 72.3408 80.8845H71.0503V81.6287H72.2404L75.017 84.5609L69.0037 91.4209L62.9838 84.5602L65.7631 81.6287H66.9752V80.8845H65.6627C65.5257 80.8845 65.3927 80.942 65.2983 81.042L62.301 84.2033C62.1188 84.3953 62.1128 84.6907 62.2877 84.8901L68.6261 92.1124C68.7218 92.2212 68.8595 92.2834 69.0037 92.2834C69.148 92.2834 69.2863 92.2205 69.3814 92.1117L75.7125 84.8894C75.8874 84.6907 75.882 84.3953 75.6992 84.2027L75.6999 84.204Z" fill="#00D58C"/>
+</g>
+<path id="Vector_3" d="M72.003 113H66.003V115H72.003V113Z" fill="#00D58C"/>
+</g>
+<defs>
+<filter id="filter0_d_0_10" x="0" y="1.69873e-06" width="137.999" height="174.688" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="25"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0.835294 0 0 0 0 0.54902 0 0 0 0.05 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_10"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_10" result="shape"/>
+</filter>
+<clipPath id="clip0_0_10">
+<rect width="13.6794" height="11.3995" fill="white" transform="translate(62.1595 80.8845)"/>
+</clipPath>
+</defs>
+</svg>
