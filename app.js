@@ -311,6 +311,367 @@ function persistScenes() {
   if (state.loggedIn) persistSession();
 }
 
+const PROFILE_TONES = ["Warm", "Neutral", "Serious"];
+const PROFILE_RIGHTS = ["Admin", "Member", "Guest"];
+
+function profileStamp(name, seed) {
+  const slug = String(name || "USER").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 8) || "USER";
+  const tail = String(seed || "0000").replace(/\D/g, "").slice(-4).padStart(4, "0");
+  return `PRF-${slug}-${tail}`;
+}
+
+function profileLog(kind, text, when, room) {
+  return { kind, text, when, room: room || "" };
+}
+
+function defaultProfilesForProperty(rec = currentPropertyRecord()) {
+  const key = String(rec?.id || currentPropertyRecord()?.id || "");
+  const owner = propertyOwner(state.property);
+  const rights = state.property?.ownerRole === "Guest" ? "Guest" : (state.property?.ownerRole === "Owner" ? "Admin" : (state.property?.ownerRole || "Admin"));
+  const integrator = [state.account.first, state.account.last].filter(Boolean).join(" ") || "John Doe";
+  const room = existingRoomNames()[0] || "Home";
+  const catalogs = {
+    "p-christo": [
+      {
+        id: "pr-christo",
+        name: "Christo Reyes",
+        rights: "Admin",
+        here: true,
+        where: "Kitchen",
+        since: "14 months",
+        tone: "Warm",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-CHRISTO-8841",
+        pin: "Enabled",
+        lastSeen: "Now",
+        heardOn: "Jemm Mic · Kitchen",
+        activity: "Daily",
+        log: [
+          profileLog("voice", "Hey Jemm, turn off Jemm Arc", "Today 7:12 AM", "Kitchen"),
+          profileLog("jemm", "Jemm Arc set to Off from Christo’s voice command", "Today 7:12 AM", "Kitchen"),
+          profileLog("device", "Kitchen lights to 40%", "Yesterday 9:41 PM", "Kitchen"),
+          profileLog("jemm", "Goodnight routine skipped — Arc is off", "Yesterday 10:02 PM", "Primary Bedroom"),
+        ],
+      },
+      {
+        id: "pr-elena",
+        name: "Elena Reyes",
+        rights: "Member",
+        here: true,
+        where: "Office",
+        since: "11 months",
+        tone: "Warm",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-ELENA-2290",
+        pin: "Enabled",
+        lastSeen: "8 min ago",
+        heardOn: "Jemm Arc · Office",
+        activity: "Evenings",
+        log: [
+          profileLog("voice", "Hey Jemm, set Office lights to warm", "Today 6:58 AM", "Office"),
+          profileLog("jemm", "Office lights 2700K at 55%", "Today 6:58 AM", "Office"),
+          profileLog("jemm", "Do not disturb until 10 AM", "Today 7:04 AM", "Office"),
+        ],
+      },
+      {
+        id: "pr-luca",
+        name: "Luca Reyes",
+        rights: "Guest",
+        here: false,
+        where: "",
+        since: "8 months",
+        tone: "Neutral",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-LUCA-4412",
+        pin: "Not set",
+        lastSeen: "Yesterday 8:14 PM",
+        heardOn: "Jemm Mic · Living Room",
+        activity: "Away this morning",
+        log: [
+          profileLog("voice", "Hey Jemm, play something in Living Room", "Yesterday 8:12 PM", "Living Room"),
+          profileLog("jemm", "Audio started · Living Room speakers", "Yesterday 8:12 PM", "Living Room"),
+        ],
+      },
+    ],
+    "p-langford": [
+      {
+        id: "pr-maya",
+        name: "Maya Langford",
+        rights: "Admin",
+        here: true,
+        where: "Living Room",
+        since: "2 years",
+        tone: "Serious",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-MAYA-1102",
+        pin: "Enabled",
+        lastSeen: "Now",
+        heardOn: "Jemm Arc · Office",
+        activity: "Daily",
+        log: [
+          profileLog("voice", "Hey Jemm, lock the front door", "Today 6:40 AM", "Living Room"),
+          profileLog("jemm", "Front door locked", "Today 6:40 AM", "Foyer"),
+          profileLog("device", "Living Room shades to 20%", "Yesterday 7:15 PM", "Living Room"),
+        ],
+      },
+      {
+        id: "pr-noah",
+        name: "Noah Langford",
+        rights: "Member",
+        here: false,
+        where: "",
+        since: "2 years",
+        tone: "Neutral",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-NOAH-7733",
+        pin: "Enabled",
+        lastSeen: "3 hours ago",
+        heardOn: "Jemm Mic · Living Room",
+        activity: "Away 3 hours",
+        log: [
+          profileLog("voice", "Hey Jemm, I’m heading out", "Today 4:18 AM", "Foyer"),
+          profileLog("jemm", "Away mode — HVAC eco, lights off", "Today 4:18 AM", "Foyer"),
+        ],
+      },
+      {
+        id: "pr-aria",
+        name: "Aria Chen",
+        rights: "Guest",
+        here: true,
+        where: "Guest Bedroom",
+        since: "3 weeks",
+        tone: "Warm",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-ARIA-5560",
+        pin: "Not set",
+        lastSeen: "Now",
+        heardOn: "Jemm Mic · Guest Bedroom",
+        activity: "Staying over",
+        log: [
+          profileLog("voice", "Hey Jemm, make Guest Bedroom cooler", "Today 7:01 AM", "Guest Bedroom"),
+          profileLog("jemm", "Climate set to 70°F", "Today 7:01 AM", "Guest Bedroom"),
+        ],
+      },
+    ],
+    "p-langford-guest": [
+      {
+        id: "pr-maya-g",
+        name: "Maya Langford",
+        rights: "Admin",
+        here: false,
+        where: "",
+        since: "18 months",
+        tone: "Serious",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-MAYA-1102",
+        pin: "Enabled",
+        lastSeen: "Remote · yesterday",
+        heardOn: "App",
+        activity: "Checks in remotely",
+        log: [
+          profileLog("jemm", "Maya viewed cameras from the app", "Yesterday 9:02 PM", ""),
+          profileLog("voice", "Hey Jemm, is Jordan still on site?", "Yesterday 9:03 PM", ""),
+        ],
+      },
+      {
+        id: "pr-jordan",
+        name: "Jordan Hale",
+        rights: "Guest",
+        here: true,
+        where: "Bedroom",
+        since: "5 days",
+        tone: "Neutral",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-JORDAN-9081",
+        pin: "Not set",
+        lastSeen: "Now",
+        heardOn: "Jemm Mic · Bedroom",
+        activity: "On site now",
+        log: [
+          profileLog("voice", "Hey Jemm, turn off the hallway lights", "Today 12:14 AM", "Bedroom"),
+          profileLog("jemm", "Hall lights Off", "Today 12:14 AM", "Hall"),
+        ],
+      },
+    ],
+    "p-palm": [
+      {
+        id: "pr-priya",
+        name: "Priya Nair",
+        rights: "Admin",
+        here: true,
+        where: "IT closet",
+        since: "9 months",
+        tone: "Serious",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-PRIYA-3308",
+        pin: "Enabled",
+        lastSeen: "Now",
+        heardOn: "Jemm Arc · IT closet",
+        activity: "On shift",
+        log: [
+          profileLog("voice", "Hey Jemm, mute Conference A", "Today 7:05 AM", "IT closet"),
+          profileLog("jemm", "Conference A mics muted", "Today 7:05 AM", "Conference A"),
+          profileLog("device", "Lobby display to Welcome", "Today 6:50 AM", "Lobby"),
+        ],
+      },
+      {
+        id: "pr-lobby",
+        name: "Lobby visitor",
+        rights: "Guest",
+        here: true,
+        where: "Lobby",
+        since: "Today",
+        tone: "Neutral",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-VISITOR-2204",
+        pin: "Not set",
+        lastSeen: "20 min ago",
+        heardOn: "Jemm Mic · Lobby",
+        activity: "Checked in 20 min ago",
+        log: [
+          profileLog("voice", "Hey Jemm, call the front desk", "Today 7:04 AM", "Lobby"),
+          profileLog("jemm", "Front desk notified", "Today 7:04 AM", "Lobby"),
+        ],
+      },
+      {
+        id: "pr-board",
+        name: "Board host",
+        rights: "Member",
+        here: false,
+        where: "",
+        since: "9 months",
+        tone: "Serious",
+        language: "English",
+        wake: "Hey Jemm",
+        key: "PRF-BOARD-6610",
+        pin: "Enabled",
+        lastSeen: "Yesterday 4:00 PM",
+        heardOn: "Jemm Arc · Boardroom",
+        activity: "Away until 4pm",
+        log: [
+          profileLog("jemm", "Boardroom scene ended", "Yesterday 4:00 PM", "Boardroom"),
+        ],
+      },
+    ],
+  };
+  const people = structuredClone(catalogs[key] || [
+    {
+      id: "pr-owner",
+      name: owner,
+      rights,
+      here: true,
+      where: room,
+      since: "This property",
+      tone: "Neutral",
+      language: "English",
+      wake: "Hey Jemm",
+      key: profileStamp(owner, "1001"),
+      pin: "Enabled",
+      lastSeen: "Now",
+      heardOn: "Jemm Arc",
+      activity: "Just set up",
+      log: [
+        profileLog("jemm", "Profile created during setup", "Just now", room),
+      ],
+    },
+  ]);
+  const hasIntegrator = people.some((p) => p.rights === "Integrator" || p.name === integrator);
+  if (!hasIntegrator) {
+    people.push({
+      id: "pr-integrator",
+      name: integrator,
+      rights: "Integrator",
+      here: true,
+      where: "On site",
+      since: "Setup access",
+      tone: "Serious",
+      language: "English",
+      wake: "Hey Jemm",
+      key: profileStamp(integrator, "4829"),
+      pin: "Integrator PIN",
+      lastSeen: "Now",
+      heardOn: "Integrator app",
+      activity: "Commissioning",
+      log: [
+        profileLog("jemm", "Integrator signed in on this property", "Today 6:30 AM", ""),
+        profileLog("device", "Ran device diagnostics", "Today 6:44 AM", ""),
+      ],
+    });
+  }
+  return people;
+}
+
+function propertyProfiles() {
+  if (Array.isArray(state.profiles) && state.profiles.length) return state.profiles;
+  return defaultProfilesForProperty();
+}
+
+function ensurePropertyProfiles() {
+  if (!Array.isArray(state.profiles) || !state.profiles.length) {
+    state.profiles = defaultProfilesForProperty();
+  }
+  return state.profiles;
+}
+
+function persistProfiles() {
+  const profiles = structuredClone(ensurePropertyProfiles());
+  const rec = currentPropertyRecord();
+  const name = state.property?.name;
+  state.properties = liveProperties().map((p) => {
+    const match = rec ? String(p.id) === String(rec.id) : !!(name && (p.details?.name || p.name) === name);
+    return match ? { ...p, profiles } : p;
+  });
+  if (state.loggedIn) persistSession();
+}
+
+function findProfile(id) {
+  return propertyProfiles().find((p) => String(p.id) === String(id)) || null;
+}
+
+function adminProfileCount(list = propertyProfiles()) {
+  return list.filter((p) => p.rights === "Admin").length;
+}
+
+function patchProfile(id, patch, redraw) {
+  const profiles = ensurePropertyProfiles();
+  const hit = profiles.find((p) => String(p.id) === String(id));
+  if (!hit) return null;
+  Object.assign(hit, patch);
+  persistProfiles();
+  if (redraw) setState({ profiles: state.profiles, selectedProfile: id });
+  return hit;
+}
+
+function applyProfileField(id, field, value, redraw) {
+  if (field === "rights") {
+    const person = findProfile(id);
+    if (!person || person.rights === "Integrator") return;
+    if (person.rights === "Admin" && value !== "Admin" && adminProfileCount() <= 1) {
+      flashToast("Need an admin", "Keep at least one Admin on this property.", "error");
+      if (redraw) setState({ profiles: state.profiles });
+      return;
+    }
+    patchProfile(id, { rights: value }, true);
+    return;
+  }
+  if (field === "where") {
+    if (!value) patchProfile(id, { here: false, where: "", lastSeen: "Away" }, true);
+    else patchProfile(id, { here: true, where: value, lastSeen: "Now" }, true);
+    return;
+  }
+  patchProfile(id, { [field]: value }, !!redraw);
+}
+
 function writeSceneItem(sceneId, slot, index, mutator) {
   const scenes = ensurePropertyScenes().map((s) => structuredClone(s));
   const scene = scenes.find((s) => s.id === sceneId);
@@ -699,6 +1060,7 @@ function blankState() {
     portalMode: loadMode(),
     propertyView: "rooms",
     selectedScene: null,
+    selectedProfile: null,
     reviewing: false,
     jemmVisible: loadJemmUi().on,
     jemmDock: false,
@@ -745,6 +1107,7 @@ function blankState() {
     scenesOpen: false,
     seenScenesCoach: false,
     scenes: [],
+    profiles: [],
     sceneTemplates: [],
   };
 }
@@ -2431,6 +2794,14 @@ function confirmCopy() {
       ok: n === 1 ? "Delete property" : "Delete properties",
     };
   }
+  if (c.kind === "delete-profile") {
+    const person = propertyProfiles().find((p) => p.id === c.id);
+    return {
+      title: "Remove this profile?",
+      body: `Remove ${person?.name ? `“${person.name}”` : "this profile"} from this property? They lose Jemm voice and presence on this site.`,
+      ok: "Remove profile",
+    };
+  }
   if (c.kind === "unpair") {
     const d = findSheetDevice(state.selectedDevice);
     return {
@@ -3026,6 +3397,7 @@ function planOverlayHtml(floor, selected = "", floorIdx = state.selectedFloor) {
   pins.forEach((d) => { (byRoom[d.room] ||= []).push(d); });
   const is3d = state.planView !== "2d";
   const src = floorPlanSrc(floor, is3d);
+  if (!isUsablePlanSrc(src)) return "";
   const overview = !!state.floorOverview;
   return `
     <div class="plan-stage__map ${overview ? "is-overview" : ""}">
@@ -3201,7 +3573,7 @@ function roomsHouse3dBoard() {
     return `
       <div class="house3d__level ${fi === state.selectedFloor ? "is-on" : ""}" style="--level:${fi};--level-gap:${state.floors.length > 3 ? -70 : state.floors.length > 2 ? -96 : -132}px" data-action="select-floor" data-index="${fi}">
         <span class="house3d__slab" aria-hidden="true"></span>
-        ${f.plan ? `
+        ${isUsablePlanSrc(floorPlanSrc(f, true)) ? `
         <div class="house3d__map">
           <div class="plan-stage__map">
             <img class="house3d__plan" src="${esc(floorPlanSrc(f, true))}" alt="${esc(f.name)}" />
@@ -3211,7 +3583,7 @@ function roomsHouse3dBoard() {
             }).join("")}
             ${planHereMarker(f, fi)}
           </div>
-        </div>` : planHereMarker(f, fi)}
+        </div>` : ""}
         <span class="house3d__tag">${esc(f.name)}</span>
       </div>`;
   }).join("");
@@ -3314,16 +3686,25 @@ function deviceRailRow(d) {
     </button>`;
 }
 
+function isUsablePlanSrc(src) {
+  const s = String(src || "").trim();
+  if (!s) return false;
+  if (/jemm-face|jemm-avatar|nav\/jemm|ill-empty|ill-login/i.test(s)) return false;
+  return true;
+}
+
 function floorHasPlan(floor) {
-  return !!(floor && floor.plan);
+  return isUsablePlanSrc(floor?.plan) || isUsablePlanSrc(floor?.plan3d);
 }
 
 const CUTAWAY_3D = "assets/rooms/cutaway-3d.png";
 
 function floorPlanSrc(floor, is3d = false) {
-  const plan = floor?.plan || "";
-  if (!is3d) return plan;
-  if (floor?.plan3d) return floor.plan3d;
+  const plan = isUsablePlanSrc(floor?.plan) ? String(floor.plan).trim() : "";
+  const plan3d = isUsablePlanSrc(floor?.plan3d) ? String(floor.plan3d).trim() : "";
+  if (!is3d) return plan || plan3d;
+  if (plan3d) return plan3d;
+  if (!plan) return "";
   const name = String(floor?.name || "").toLowerCase();
   if (/lobby|reception/.test(name)) return "assets/rooms/cutaway-lobby.png";
   if (/work|huddle/.test(name)) return "assets/rooms/cutaway-workspace.png";
@@ -3342,9 +3723,8 @@ function floorplanDropHtml() {
   return `
     <div class="drop drop--plan" data-plan-drop data-coach="upload">
       <div class="empty empty--plan">
-        <img src="assets/rooms/icon-3d.svg" alt="" />
         <h3>No floorplan yet</h3>
-        <p>Use the ‘Upload floorplan’ button to start adding and configuring this floor.</p>
+        <p>Upload a floorplan for this floor to see the layout here. CAD becomes a 3D model; photos stay flat.</p>
         <button type="button" class="btn btn--ghost" data-action="browse">Upload floorplan</button>
       </div>
     </div>`;
@@ -3366,7 +3746,8 @@ function roomsFloorplan(floor, room) {
       <div class="rooms-plan__head">
         ${roomsPlanTitleHtml(room, floor)}
       </div>`;
-  if (!floorHasPlan(floor)) {
+  const is3d = state.planView !== "2d";
+  if (!isUsablePlanSrc(floorPlanSrc(floor, is3d))) {
     return `
     <div class="rooms-plan">
       ${head}
@@ -3375,7 +3756,6 @@ function roomsFloorplan(floor, room) {
       </div>
     </div>`;
   }
-  const is3d = state.planView !== "2d";
   return `
     <div class="rooms-plan">
       ${head}
@@ -3544,10 +3924,10 @@ function roomSuggestHtml() {
 }
 
 function floorplanMedia(floor, room) {
-  if (!floorHasPlan(floor)) {
+  const is3d = state.planView !== "2d";
+  if (!isUsablePlanSrc(floorPlanSrc(floor, is3d))) {
     return `<div class="space-panel__media space-panel__media--empty">${floorplanDropHtml()}</div>`;
   }
-  const is3d = state.planView !== "2d";
   const selected = roomName(room);
   return `
     <div class="space-panel__media ${is3d ? "is-3d" : ""}">
@@ -3662,6 +4042,7 @@ function seedCompletedProperty() {
     floors: cloneFloors(home.floors),
     devices: cloneDevices(home.devices),
     scenes: structuredClone(home.scenes && home.scenes.length ? home.scenes : defaultScenesForProperty(home.details)),
+    profiles: structuredClone(home.profiles && home.profiles.length ? home.profiles : defaultProfilesForProperty(home)),
     sceneTemplates: Array.isArray(loadSession()?.sceneTemplates) ? loadSession().sceneTemplates : [],
     arcStatus: "online",
     deviceScan: "found",
@@ -3683,6 +4064,7 @@ function snapshotDraft() {
     floors: structuredClone(state.floors),
     devices: structuredClone(state.devices),
     scenes: structuredClone(state.scenes || []),
+    profiles: structuredClone(state.profiles || []),
     arcStatus: state.arcStatus,
     deviceScan: state.deviceScan,
     selectedFloor: state.selectedFloor,
@@ -3706,6 +4088,7 @@ function pendingRecordFromState(id) {
     floors: structuredClone(state.floors || []),
     devices: structuredClone(state.devices || []),
     scenes: structuredClone(state.scenes || []),
+    profiles: structuredClone(state.profiles || []),
     arcStatus: state.arcStatus || "offline",
     setupScreen: ["account", "property", "arc", "rooms"].includes(screen) ? screen : "property",
     addingProperty: !!state.addingProperty,
@@ -3743,6 +4126,7 @@ function migrateDraftToProperties() {
     floors: state.floors,
     devices: state.devices,
     scenes: state.scenes,
+    profiles: state.profiles,
     arcStatus: state.arcStatus,
     screen: state.screen,
     addingProperty: state.addingProperty,
@@ -3752,6 +4136,7 @@ function migrateDraftToProperties() {
   state.floors = structuredClone(draft.floors || []);
   state.devices = structuredClone(draft.devices || []);
   state.scenes = structuredClone(draft.scenes || []);
+  state.profiles = structuredClone(draft.profiles || []);
   state.arcStatus = draft.arcStatus || "offline";
   state.screen = draft.screen || "property";
   state.addingProperty = !!draft.addingProperty;
@@ -3819,6 +4204,7 @@ function resumePendingProperty(p) {
     floors: structuredClone(p.floors || []),
     devices: structuredClone(p.devices || []),
     scenes: structuredClone(p.scenes && p.scenes.length ? p.scenes : []),
+    profiles: structuredClone(p.profiles && p.profiles.length ? p.profiles : []),
     arcStatus: p.arcStatus || "offline",
     deviceScan: p.deviceScan || "idle",
     addingProperty: !!p.addingProperty,
@@ -3894,6 +4280,7 @@ function finishSetup() {
     floors: structuredClone(state.floors),
     devices: structuredClone(state.devices),
     scenes: structuredClone(ensurePropertyScenes()),
+    profiles: structuredClone(ensurePropertyProfiles()),
     arcStatus: state.arcStatus,
   };
   const name = record.details.name || "New property";
@@ -4572,6 +4959,8 @@ function loadPropertyRecord(p) {
   state.floors = structuredClone(p.floors || []);
   state.devices = (p.devices || []).map((d) => deviceView(structuredClone(d)));
   state.scenes = structuredClone(p.scenes && p.scenes.length ? p.scenes : defaultScenesForProperty(p.details || p));
+  state.profiles = structuredClone(p.profiles && p.profiles.length ? p.profiles : defaultProfilesForProperty(p));
+  state.selectedProfile = state.profiles[0]?.id || null;
   state.arcStatus = p.arcStatus || "online";
   state.deviceScan = "found";
   state.reviewing = true;
@@ -5509,7 +5898,7 @@ function scenesForDevice(d) {
 }
 
 function deviceHistoryLog(d) {
-  const people = householdProfiles();
+  const people = propertyProfiles();
   const admin = people.find((p) => p.rights === "Admin") || people[0];
   const member = people.find((p) => p.rights === "Member") || people.find((p) => p.rights === "Guest") || admin;
   const integrator = people.find((p) => p.rights === "Integrator") || { name: [state.account.first, state.account.last].filter(Boolean).join(" ") || "Integrator" };
@@ -6691,49 +7080,183 @@ function propertyAccessKey(p = state.property) {
   return p.accessKey || "—";
 }
 
-function householdProfiles() {
-  const key = String(currentPropertyRecord()?.id || "");
-  const owner = propertyOwner(state.property);
-  const rights = state.property?.ownerRole === "Guest" ? "Guest" : (state.property?.ownerRole === "Owner" ? "Admin" : (state.property?.ownerRole || "Admin"));
-  const integrator = [state.account.first, state.account.last].filter(Boolean).join(" ") || "John Doe";
-  const room = existingRoomNames()[0] || "Home";
-  const catalogs = {
-    "p-christo": [
-      { name: "Christo Reyes", rights: "Admin", here: true, where: "Kitchen", since: "14 months", voice: "Warm, concise", activity: "Daily" },
-      { name: "Elena Reyes", rights: "Member", here: true, where: "Office", since: "11 months", voice: "Calm, unhurried", activity: "Evenings" },
-      { name: "Luca Reyes", rights: "Guest", here: false, where: "", since: "8 months", voice: "Playful, short", activity: "Away this morning" },
-    ],
-    "p-langford": [
-      { name: "Maya Langford", rights: "Admin", here: true, where: "Living Room", since: "2 years", voice: "Direct, low volume", activity: "Daily" },
-      { name: "Noah Langford", rights: "Member", here: false, where: "", since: "2 years", voice: "Neutral, brief", activity: "Away 3 hours" },
-      { name: "Aria Chen", rights: "Guest", here: true, where: "Guest Bedroom", since: "3 weeks", voice: "Polite, slow", activity: "Staying over" },
-    ],
-    "p-langford-guest": [
-      { name: "Maya Langford", rights: "Admin", here: false, where: "", since: "18 months", voice: "Direct, brief", activity: "Checks in remotely" },
-      { name: "Jordan Hale", rights: "Guest", here: true, where: "Bedroom", since: "5 days", voice: "Casual, short", activity: "On site now" },
-    ],
-    "p-palm": [
-      { name: "Priya Nair", rights: "Admin", here: true, where: "IT closet", since: "9 months", voice: "Formal, concise", activity: "On shift" },
-      { name: "Lobby visitor", rights: "Guest", here: true, where: "Lobby", since: "Today", voice: "Neutral, short", activity: "Checked in 20 min ago" },
-      { name: "Board host", rights: "Member", here: false, where: "", since: "9 months", voice: "Formal, brief", activity: "Away until 4pm" },
-    ],
-  };
-  const people = catalogs[key] || [
-    { name: owner, rights, here: true, where: room, since: "This property", voice: "Default, concise", activity: "Just set up" },
-  ];
-  const hasIntegrator = people.some((p) => p.name === integrator || p.rights === "Integrator");
-  if (!hasIntegrator) {
-    people.push({
-      name: integrator,
-      rights: "Integrator",
-      here: true,
-      where: "On site",
-      since: "Setup access",
-      voice: "Direct, brief",
-      activity: "Commissioning",
-    });
+function profilePresence(person) {
+  if (!person) return "Away";
+  if (person.here) return person.where ? `Here · ${person.where}` : "Here";
+  return "Away";
+}
+
+function floorForRoomName(label) {
+  const want = String(label || "").toLowerCase();
+  if (!want) return null;
+  return (state.floors || []).find((f) => (f.rooms || []).some((r) => roomName(r).toLowerCase() === want)) || null;
+}
+
+function firstFloorWithPlan() {
+  return (state.floors || []).find((f) => floorHasPlan(f)) || null;
+}
+
+function propertyBannerSrc(p = state.property) {
+  const cover = propertyCover(p);
+  if (cover) return { src: cover, kind: "cover" };
+  const floor = firstFloorWithPlan();
+  if (floor) return { src: floorPlanSrc(floor, false), kind: "plan" };
+  return null;
+}
+
+function profilePresenceMapHtml(person) {
+  if (!person?.here) {
+    return `
+      <div class="profile-map profile-map--empty">
+        <p>Away from this property. Their room on the floorplan will show here when they’re on site.</p>
+      </div>`;
   }
-  return people;
+  if (!person.where) {
+    return `
+      <div class="profile-map profile-map--empty">
+        <p>On site, but no room is set. Choose where they are to pin them on the floorplan.</p>
+      </div>`;
+  }
+  const floor = floorForRoomName(person.where);
+  if (!floorHasPlan(floor)) {
+    if (person.where && !floorForRoomName(person.where)) {
+      return `
+        <div class="profile-map profile-map--empty">
+          <p>On site, but “${esc(person.where)}” isn’t a room on the floorplan.</p>
+        </div>`;
+    }
+    return `
+      <div class="profile-map profile-map--empty">
+        <p>No floorplan uploaded for this property yet. Upload one to see where they are.</p>
+      </div>`;
+  }
+  const pos = planRoomPos(person.where);
+  return `
+    <div class="profile-map">
+      <img src="${esc(floorPlanSrc(floor, false))}" alt="" />
+      <span class="profile-map__pin" style="left:${pos.x}%;top:${pos.y}%"></span>
+      <p class="profile-map__label">${esc(person.where)}${floor.name ? ` · ${esc(floor.name)}` : ""}</p>
+    </div>`;
+}
+
+function profilePickerHtml(activeId) {
+  const people = propertyProfiles();
+  return `
+    <nav class="scene-picker profile-picker" aria-label="Profiles">
+      ${people.map((p) => `
+        <button type="button" class="profile-row ${String(p.id) === String(activeId) ? "is-on" : ""}" data-action="open-profile" data-id="${esc(p.id)}"${String(p.id) === String(activeId) ? ` aria-current="true"` : ""}>
+          <i class="profile-card__dot ${p.here ? "" : "is-away"}"></i>
+          <span class="profile-row__who">
+            <strong>${esc(p.name)}</strong>
+            <span>${esc(p.rights)} · ${esc(profilePresence(p))}</span>
+          </span>
+        </button>`).join("")}
+      <button type="button" class="scene-tile scene-tile--add" data-action="add-profile">
+        <span>+ Add profile</span>
+      </button>
+    </nav>`;
+}
+
+function profilesModal() {
+  const people = ensurePropertyProfiles();
+  const person = findProfile(state.selectedProfile) || people[0];
+  if (!person) return "";
+  const rooms = existingRoomNames();
+  const lockedRights = person.rights === "Integrator";
+  const lastAdmin = person.rights === "Admin" && adminProfileCount() <= 1;
+  const presence = profilePresence(person);
+  const logs = Array.isArray(person.log) ? person.log : [];
+  const rightsOpts = lockedRights ? ["Integrator"] : PROFILE_RIGHTS;
+  return `
+    <div class="overlay" data-action="close-modal">
+      <div class="modal modal--scene modal--profiles" role="dialog" aria-modal="true" aria-labelledby="profiles-title">
+        <div class="modal__top">
+          <div class="scene-sum__head">
+            <h2 id="profiles-title">Profiles</h2>
+            <p>${people.length} on this property · Voice, presence, and access Jemm uses here.</p>
+          </div>
+          <button type="button" class="modal__x" data-action="close-modal" aria-label="Close">×</button>
+        </div>
+        <div class="modal--scene__layout modal--profiles__layout">
+        ${profilePickerHtml(person.id)}
+        <div class="modal--profiles__detail">
+          <div class="profile-detail__head">
+            <div>
+              <p class="profile-detail__kicker">${esc(presence)}</p>
+              <h3>${esc(person.name)}</h3>
+              <p>${esc(person.rights)} · With Jemm ${esc(person.since || "—")}</p>
+            </div>
+            <button type="button" class="btn btn--ghost" data-action="delete-profile" data-id="${esc(person.id)}" ${lastAdmin ? "disabled" : ""}>${lastAdmin ? "Last admin" : "Remove"}</button>
+          </div>
+          ${profilePresenceMapHtml(person)}
+          <div class="profile-detail__grid">
+            <label class="field">
+              <span class="field__label">Display name</span>
+              <input type="text" value="${esc(person.name)}" data-profile-field="name" data-profile-id="${esc(person.id)}" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span class="field__label">Access</span>
+              <select data-profile-field="rights" data-profile-id="${esc(person.id)}" ${lockedRights ? "disabled" : ""}>
+                ${rightsOpts.map((r) => `<option value="${esc(r)}" ${person.rights === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
+              </select>
+            </label>
+            <div class="field">
+              <span class="field__label">Tone of voice</span>
+              <div class="profile-tones" role="radiogroup" aria-label="Tone of voice">
+                ${PROFILE_TONES.map((t) => `
+                  <button type="button" class="${person.tone === t ? "is-on" : ""}" data-action="set-profile-tone" data-id="${esc(person.id)}" data-value="${esc(t)}" role="radio" aria-checked="${person.tone === t}">${esc(t)}</button>`).join("")}
+              </div>
+            </div>
+            <label class="field">
+              <span class="field__label">Where they are</span>
+              <select data-profile-field="where" data-profile-id="${esc(person.id)}">
+                <option value="" ${person.here ? "" : "selected"}>Away</option>
+                ${rooms.map((r) => `<option value="${esc(r)}" ${person.here && person.where === r ? "selected" : ""}>${esc(r)}</option>`).join("")}
+                ${person.here && person.where && !rooms.includes(person.where) ? `<option value="${esc(person.where)}" selected>${esc(person.where)}</option>` : ""}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Language</span>
+              <input type="text" value="${esc(person.language || "English")}" data-profile-field="language" data-profile-id="${esc(person.id)}" />
+            </label>
+            <label class="field">
+              <span class="field__label">Wake phrase</span>
+              <input type="text" value="${esc(person.wake || "Hey Jemm")}" data-profile-field="wake" data-profile-id="${esc(person.id)}" />
+            </label>
+          </div>
+          <div class="profile-key">
+            <div>
+              <span>User profile key</span>
+              <strong>${esc(person.key || "—")}</strong>
+            </div>
+            <button type="button" class="btn btn--secondary" data-action="copy-profile-key" data-id="${esc(person.id)}">Copy</button>
+          </div>
+          <div class="profile-stats">
+            <div><span>Last seen</span><strong>${esc(person.lastSeen || "—")}</strong></div>
+            <div><span>Last heard on</span><strong>${esc(person.heardOn || "—")}</strong></div>
+            <div><span>PIN / unlock</span><strong>${esc(person.pin || "—")}</strong></div>
+            <div><span>Typical activity</span><strong>${esc(person.activity || "—")}</strong></div>
+          </div>
+          <section class="profile-log-wrap">
+            <h4>Recent activity</h4>
+            <p>Voice and Jemm actions for this person — useful when diagnosing why Arc or a room changed.</p>
+            ${logs.length ? `
+              <ol class="profile-log">
+                ${logs.map((row) => `
+                  <li>
+                    <span class="profile-log__kind is-${esc(row.kind || "jemm")}">${esc(row.kind === "voice" ? "Voice" : row.kind === "device" ? "Device" : "Jemm")}</span>
+                    <strong>${esc(row.text)}</strong>
+                    <span>${esc([row.when, row.room].filter(Boolean).join(" · "))}</span>
+                  </li>`).join("")}
+              </ol>` : `<p class="muted-note">No recent activity on this property.</p>`}
+          </section>
+        </div>
+        </div>
+        <div class="modal__cta">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">Done</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function weatherChipHtml() {
@@ -6742,55 +7265,6 @@ function weatherChipHtml() {
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.1" fill="currentColor"/><g stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M3.1 12.9l1.1-1.1M11.8 4.2l1.1-1.1"/></g></svg>
           <span>84 °F • Sunny</span>
         </div>`;
-}
-
-function profilesModal() {
-  const people = householdProfiles();
-  return `
-    <div class="overlay" data-action="close-modal">
-      <div class="modal modal--profiles" role="dialog" aria-modal="true" aria-labelledby="profiles-title">
-        <div class="modal__top">
-          <h2 id="profiles-title">Profiles</h2>
-          <button type="button" class="modal__x" data-action="close-modal" aria-label="Close">×</button>
-        </div>
-        <div class="modal__body modal__body--left profile-list">
-          <p class="profile-list__hint">Access and presence Jemm uses on this property. Tone and habits are short summaries — not full personalization.</p>
-          ${people.map((person) => {
-            const presence = person.here
-              ? (person.where ? `In house · ${person.where}` : "In house")
-              : "Away";
-            return `
-            <article class="profile-card">
-              <header class="profile-card__head">
-                <strong>${esc(person.name)}</strong>
-                <span class="pair-chip">${esc(person.rights)}</span>
-              </header>
-              <div class="profile-card__meta">
-                <div>
-                  <span>Presence</span>
-                  <strong class="profile-card__here"><i class="profile-card__dot ${person.here ? "" : "is-away"}"></i>${esc(presence)}</strong>
-                </div>
-                <div>
-                  <span>With Jemm</span>
-                  <strong>${esc(person.since)}</strong>
-                </div>
-                <div>
-                  <span>Voice</span>
-                  <strong>${esc(person.voice)}</strong>
-                </div>
-                <div>
-                  <span>Activity</span>
-                  <strong>${esc(person.activity)}</strong>
-                </div>
-              </div>
-            </article>`;
-          }).join("")}
-        </div>
-        <div class="modal__cta">
-          <button type="button" class="btn btn--secondary" data-action="close-modal">Close</button>
-        </div>
-      </div>
-    </div>`;
 }
 
 function propertyCard() {
@@ -6803,11 +7277,11 @@ function propertyCard() {
   const line1 = [p.street, p.unit].filter(Boolean).join(", ") || "Address not set";
   const line2 = [p.city, p.state, p.zip].filter(Boolean).join(", ");
   const address = [line1, line2].filter(Boolean).join(", ");
-  const cover = propertyCover(p);
+  const banner = propertyBannerSrc(p);
   return `
     <section class="prop-hero">
-      <div class="prop-hero__cover${cover ? " has-photo" : ""}">
-        ${cover ? `<img src="${esc(cover)}" alt="" />` : ""}
+      <div class="prop-hero__cover${banner ? " has-photo" : ""}${banner?.kind === "plan" ? " has-plan" : ""}">
+        ${banner ? `<img src="${esc(banner.src)}" alt="" />` : ""}
         <div class="prop-hero__cover-row">
           <div class="prop-hero__heading">
             <h2 class="prop-hero__title">${esc(name)}</h2>
@@ -8872,10 +9346,15 @@ document.addEventListener("click", (e) => {
       return;
     }
     const was = state.modal;
+    const confirmKind = state.confirm?.kind;
     const token = (state.scanToken || 0) + 1;
     const scan = was === "add-device" && state.deviceScan === "scanning" ? "idle" : state.deviceScan;
     if (was === "scene-templates" && state.selectedScene) {
       setState({ modal: "scene" });
+      return;
+    }
+    if (was === "confirm" && confirmKind === "delete-profile") {
+      setState({ modal: "profiles", confirm: null });
       return;
     }
     if (was === "jemm-save") {
@@ -8910,7 +9389,62 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (act === "view-profiles") {
-    setState({ modal: "profiles" });
+    const people = ensurePropertyProfiles();
+    const current = findProfile(state.selectedProfile);
+    setState({ modal: "profiles", selectedProfile: current?.id || people[0]?.id || null, profiles: people });
+    return;
+  }
+  if (act === "open-profile") {
+    setState({ selectedProfile: action.dataset.id, modal: "profiles" });
+    return;
+  }
+  if (act === "add-profile") {
+    const people = ensurePropertyProfiles();
+    const id = "pr-" + Date.now();
+    people.push({
+      id,
+      name: "New profile",
+      rights: "Guest",
+      here: false,
+      where: "",
+      since: "Just added",
+      tone: "Neutral",
+      language: "English",
+      wake: "Hey Jemm",
+      key: profileStamp("New profile", String(Date.now())),
+      pin: "Not set",
+      lastSeen: "Never",
+      heardOn: "—",
+      activity: "None yet",
+      log: [profileLog("jemm", "Profile added by integrator", "Just now", "")],
+    });
+    persistProfiles();
+    setState({ profiles: people, selectedProfile: id, modal: "profiles" });
+    flashToast("Profile added", "Set a name and access on the right.");
+    return;
+  }
+  if (act === "set-profile-tone") {
+    const tone = PROFILE_TONES.includes(action.dataset.value) ? action.dataset.value : "Neutral";
+    patchProfile(action.dataset.id, { tone }, true);
+    return;
+  }
+  if (act === "copy-profile-key") {
+    const key = findProfile(action.dataset.id)?.key;
+    if (!key) return;
+    const done = () => flashToast("Copied profile key", key);
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(key).then(done).catch(done);
+    else done();
+    return;
+  }
+  if (act === "delete-profile") {
+    const id = action.dataset.id;
+    const person = findProfile(id);
+    if (!person) return;
+    if (person.rights === "Admin" && adminProfileCount() <= 1) {
+      flashToast("Need an admin", "Keep at least one Admin on this property.", "error");
+      return;
+    }
+    askConfirm({ kind: "delete-profile", id });
     return;
   }
   if (act === "draft-type") {
@@ -9396,6 +9930,19 @@ document.addEventListener("click", (e) => {
     if (kind === "delete-rooms") deleteSelectedRooms();
     else if (kind === "delete-room") deleteRoomAt(Number(state.confirm.index));
     else if (kind === "delete-properties") deleteSelectedProperties(state.confirm.ids);
+    else if (kind === "delete-profile") {
+      const id = state.confirm.id;
+      const people = ensurePropertyProfiles().filter((p) => String(p.id) !== String(id));
+      state.profiles = people;
+      persistProfiles();
+      setState({
+        modal: "profiles",
+        confirm: null,
+        profiles: people,
+        selectedProfile: people[0]?.id || null,
+      });
+      flashToast("Profile removed", "They no longer have Jemm access on this property.");
+    }
     else if (kind === "unpair") unpairSelectedDevice();
     else setState({ modal: null, confirm: null });
     return;
@@ -9444,11 +9991,16 @@ document.addEventListener("click", (e) => {
     state.uploadPlan = null;
     state.selectedRooms = [];
     state.scenes = [];
+    state.profiles = [];
     go("property");
   }
 });
 
 document.addEventListener("input", (e) => {
+  if (e.target.dataset.profileField) {
+    applyProfileField(e.target.dataset.profileId, e.target.dataset.profileField, e.target.value, false);
+    return;
+  }
   const bind = e.target.dataset.bind;
   if (bind) {
     if (bind === "search") {
@@ -9548,6 +10100,10 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("change", (e) => {
+  if (e.target.dataset.profileField) {
+    applyProfileField(e.target.dataset.profileId, e.target.dataset.profileField, e.target.value, true);
+    return;
+  }
   if (e.target.dataset.sceneNum != null) {
     persistScenes();
     return;
