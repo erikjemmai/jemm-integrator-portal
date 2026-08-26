@@ -6,13 +6,14 @@ const TIMEZONES = [
   "(UTC+00:00) UTC",
 ];
 
-const EXAMPLE_LAYOUT_REV = 4;
+const EXAMPLE_LAYOUT_REV = 5;
 
 const DEMO_FLOORS = [
   {
     id: "f1",
     name: "1st floor",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-3d.png",
     rooms: [
       { name: "Foyer" },
       { name: "Living Room", photo: "assets/room-living.png" },
@@ -28,6 +29,7 @@ const DEMO_FLOORS = [
     id: "f2",
     name: "2nd floor",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-upper.png",
     rooms: [
       { name: "Guest Bedroom" },
       { name: "Kids Bedroom" },
@@ -41,6 +43,7 @@ const DEMO_FLOORS = [
     id: "f3",
     name: "Lower level",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-lower.png",
     rooms: [
       { name: "Gym" },
       { name: "Wine cellar" },
@@ -52,6 +55,7 @@ const DEMO_FLOORS = [
     id: "f4",
     name: "Outside",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-outdoor.png",
     rooms: [
       { name: "Front yard" },
       { name: "Backyard" },
@@ -685,6 +689,7 @@ function blankState() {
     deviceAccord: {},
     addDeviceKind: null,
     flashingDevice: null,
+    updatingDevice: null,
     propertyDraft: null,
     previewProperty: null,
     crumbSource: null,
@@ -727,6 +732,8 @@ function blankState() {
     jemmVideo: false,
     jemmNotice: null,
     jemmNoticeNext: null,
+    incidents: [],
+    jemmAssist: null,
     sidebarOpen: true,
     restoreSidebar: false,
     formTouched: {},
@@ -914,7 +921,7 @@ function jemmNavToggle() {
           <img class="jemm-place__face" src="assets/nav/jemm.png" alt="" />
         </button>
         <button type="button" class="jemm-place__open" data-action="toggle-jemm-menu" aria-haspopup="listbox" aria-expanded="${open}" aria-label="Choose where Jemm appears">
-          <span>Jemm</span>
+          <span>${place === "bottom" ? "Bottom" : "Top"}</span>
           <img class="jemm-place__chev ${open ? "is-open" : ""}" src="assets/nav/chevron.svg" alt="" />
         </button>
       </div>
@@ -1073,6 +1080,9 @@ function go(screen) {
   else if (from === "dashboard") patch.crumbSource = null;
   if (["dashboard", "clients", "hub-rooms", "insights", "settings", "profile", "done"].includes(screen) && state.reviewing) {
     patch.reviewing = false;
+  }
+  if (["dashboard", "clients", "insights", "settings", "profile"].includes(screen) && state.jemmAssist && !state.jemmAssist.cta) {
+    patch.jemmAssist = null;
   }
   if (screen === "rooms" && state.loggedIn && !state.addingProperty && !state.pendingPropertyId && (state.property.name || state.floors.length)) {
     patch.reviewing = true;
@@ -1335,6 +1345,7 @@ const DEMO_FLOORS_LANGFORD = [
     id: "lf1",
     name: "Main level",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-3d.png",
     rooms: [
       { name: "Living Room", photo: "assets/room-living.png" },
       { name: "Kitchen" },
@@ -1348,6 +1359,7 @@ const DEMO_FLOORS_LANGFORD = [
     id: "lf2",
     name: "Upper level",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-upper.png",
     rooms: [
       { name: "Guest Bedroom" },
       { name: "Media Room" },
@@ -1359,6 +1371,7 @@ const DEMO_FLOORS_LANGFORD = [
     id: "lf3",
     name: "Roof terrace",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-roof.png",
     rooms: [
       { name: "Roof lounge" },
       { name: "Outdoor kitchen" },
@@ -1369,6 +1382,7 @@ const DEMO_FLOORS_LANGFORD = [
     id: "lf4",
     name: "Outside",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-outdoor.png",
     rooms: [
       { name: "Front terrace" },
       { name: "Pool deck" },
@@ -1411,6 +1425,7 @@ const DEMO_FLOORS_GUEST = [
     id: "gf1",
     name: "Main level",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-guest.png",
     rooms: [
       { name: "Living Room", photo: "assets/room-living.png" },
       { name: "Kitchen" },
@@ -1422,6 +1437,7 @@ const DEMO_FLOORS_GUEST = [
     id: "gf2",
     name: "Loft",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-upper.png",
     rooms: [
       { name: "Loft bedroom" },
       { name: "Loft bath" },
@@ -1431,6 +1447,7 @@ const DEMO_FLOORS_GUEST = [
     id: "gf3",
     name: "Garden level",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-lower.png",
     rooms: [
       { name: "Studio" },
       { name: "Laundry" },
@@ -1440,6 +1457,7 @@ const DEMO_FLOORS_GUEST = [
     id: "gf4",
     name: "Outside",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-outdoor.png",
     rooms: [
       { name: "Front yard" },
       { name: "Courtyard" },
@@ -1477,6 +1495,7 @@ const DEMO_FLOORS_PALM = [
     id: "pf1",
     name: "Lobby level",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-lobby.png",
     rooms: [
       { name: "Lobby" },
       { name: "Reception" },
@@ -1488,6 +1507,7 @@ const DEMO_FLOORS_PALM = [
     id: "pf2",
     name: "Workspace",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-workspace.png",
     rooms: [
       { name: "Open office" },
       { name: "Huddle 1" },
@@ -1499,6 +1519,7 @@ const DEMO_FLOORS_PALM = [
     id: "pf3",
     name: "Amenities",
     plan: "assets/floorplan-1.png",
+    plan3d: "assets/rooms/cutaway-amenities.png",
     rooms: [
       { name: "Wellness" },
       { name: "Cafe" },
@@ -1510,6 +1531,7 @@ const DEMO_FLOORS_PALM = [
     id: "pf4",
     name: "Exterior",
     plan: "assets/floorplan-2.png",
+    plan3d: "assets/rooms/cutaway-plaza.png",
     rooms: [
       { name: "Plaza" },
       { name: "Garage" },
@@ -2321,7 +2343,7 @@ function tableFilterBtn(scope) {
 function diagnosticsBtnHtml() {
   const n = alertDevices().length;
   return `
-    <button type="button" class="btn btn--secondary ${n ? "is-diag-alert" : ""}" data-action="show-diagnostics">
+    <button type="button" class="btn btn--tertiary ${n ? "is-diag-alert" : ""}" data-action="show-diagnostics">
       Diagnostics${n ? `<em class="btn__count">${n}</em>` : ""}
     </button>`;
 }
@@ -2903,6 +2925,17 @@ function bulkRenameSelected(base) {
   flashToast("Rooms updated", `${picked.length} room${picked.length === 1 ? "" : "s"} renamed.`);
 }
 
+function deviceIsUpdating(d) {
+  return !!(d && String(state.updatingDevice) === String(d.id));
+}
+
+function bumpFirmware(ver) {
+  const parts = String(ver || "1.0.0").split(".").map((n) => parseInt(n, 10));
+  if (!parts.length || parts.some((n) => !Number.isFinite(n))) return "1.0.1";
+  parts[parts.length - 1] += 1;
+  return parts.join(".");
+}
+
 function deviceIsAlert(d) {
   if (!d) return false;
   if (d.offline) return true;
@@ -2912,6 +2945,7 @@ function deviceIsAlert(d) {
 
 function deviceStatusLabel(d) {
   if (!d) return "Unknown";
+  if (deviceIsUpdating(d)) return "Updating";
   if (deviceIsAlert(d)) {
     const diag = String(d.diagnostic || "").trim();
     if (/offline|error|fault|fail/i.test(diag)) return diag;
@@ -3170,7 +3204,7 @@ function roomsHouse3dBoard() {
         ${f.plan ? `
         <div class="house3d__map">
           <div class="plan-stage__map">
-            <img class="house3d__plan" src="${esc(f.plan)}" alt="${esc(f.name)}" />
+            <img class="house3d__plan" src="${esc(floorPlanSrc(f, true))}" alt="${esc(f.name)}" />
             ${pins.map((d) => {
               const pos = devicePlanPos(d, byRoom[d.room] || [d]);
               return devicePinButton(d, pos, false, `${d.name} · ${d.room}`);
@@ -3290,7 +3324,17 @@ function floorPlanSrc(floor, is3d = false) {
   const plan = floor?.plan || "";
   if (!is3d) return plan;
   if (floor?.plan3d) return floor.plan3d;
-  if (/(?:floorplan-[12]|rooms\/cutaway-3d)\.png$/.test(plan)) return CUTAWAY_3D;
+  const name = String(floor?.name || "").toLowerCase();
+  if (/lobby|reception/.test(name)) return "assets/rooms/cutaway-lobby.png";
+  if (/work|huddle/.test(name)) return "assets/rooms/cutaway-workspace.png";
+  if (/amenit|cafe|wellness/.test(name)) return "assets/rooms/cutaway-amenities.png";
+  if (/plaza|exterior|dock/.test(name)) return "assets/rooms/cutaway-plaza.png";
+  if (/roof|terrace/.test(name)) return "assets/rooms/cutaway-roof.png";
+  if (/guest|cottage/.test(name)) return "assets/rooms/cutaway-guest.png";
+  if (/lower|garden|gym|basement/.test(name)) return "assets/rooms/cutaway-lower.png";
+  if (/out|yard|pool|patio/.test(name)) return "assets/rooms/cutaway-outdoor.png";
+  if (/2nd|upper|loft/.test(name)) return "assets/rooms/cutaway-upper.png";
+  if (/(?:floorplan-[12]|rooms\/cutaway).+\.png$/.test(plan)) return CUTAWAY_3D;
   return plan;
 }
 
@@ -4451,6 +4495,7 @@ function liveHealth(p) {
 function liveAlerts() {
   return modeProperties().filter((p) => !isPendingSetup(p)).flatMap((p) => liveHealth(p).alerts.map((d) => ({
     id: p.id,
+    deviceId: d.id,
     name: propertyName(p),
     device: d.name,
     room: d.room || "Unknown room",
@@ -4593,6 +4638,313 @@ function floorRoomForDevice(d) {
   return { selectedFloor, selectedRoom };
 }
 
+const LIVE_WATCH_EVENTS = [
+  {
+    id: "mic-langford",
+    delay: 9000,
+    propertyId: "p-langford",
+    kind: "mic-fault",
+    cta: "Investigate",
+    line: (name) => `Hey — something’s wrong with the Jemm Mic at ${name}. Let’s investigate.`,
+    arrive: (name, d) => `We’re at ${name}. ${d?.name || "Jemm Mic"} in ${d?.room || "the house"} has an audio path error. I filtered to what needs attention.`,
+    apply(p) {
+      const devices = (p.devices || []).map((d) => (d.kind === "mic"
+        ? { ...d, diagnostic: "Audio path error", on: true, offline: false }
+        : d));
+      return { ...p, devices, lastCheck: "Just now", note: "Jemm Mic in Living Room reported an audio path error." };
+    },
+    already(p) {
+      return (p.devices || []).some((d) => d.kind === "mic" && /audio path/i.test(d.diagnostic || ""));
+    },
+    deviceOf(p) {
+      return (p.devices || []).find((d) => d.kind === "mic") || null;
+    },
+  },
+  {
+    id: "outage-guest",
+    delay: 24000,
+    propertyId: "p-langford-guest",
+    kind: "power-outage",
+    cta: "Investigate",
+    line: (name) => `Power looks down at ${name}. Jemm Arc went offline. I can take you there.`,
+    arrive: (name) => `We’re at ${name}. Utility power dropped and Jemm Arc is offline. I filtered to what needs attention.`,
+    apply(p) {
+      const devices = (p.devices || []).map((d) => {
+        if (d.kind === "arc" || d.kind === "light" || d.kind === "mic") {
+          return { ...d, on: false, offline: true, diagnostic: "Power lost" };
+        }
+        return d;
+      });
+      return {
+        ...p,
+        devices,
+        arcStatus: "offline",
+        lastCheck: "Just now",
+        note: "Utility outage reported. Jemm Arc lost power.",
+      };
+    },
+    already(p) {
+      return p.arcStatus !== "online" && /outage|power/i.test(p.note || "");
+    },
+    deviceOf(p) {
+      return (p.devices || []).find((d) => d.kind === "arc") || null;
+    },
+  },
+  {
+    id: "arc-palm",
+    delay: 40000,
+    propertyId: "p-palm",
+    kind: "arc-offline",
+    cta: "Investigate",
+    line: (name) => `Jemm Arc just dropped at ${name}. Let’s check power and the network.`,
+    arrive: (name) => `We’re at ${name}. Jemm Arc is offline. I filtered to what needs attention so you can confirm the hub.`,
+    apply(p) {
+      const devices = (p.devices || []).map((d) => (d.kind === "arc"
+        ? { ...d, on: false, offline: true, diagnostic: "Heartbeat lost" }
+        : d));
+      return {
+        ...p,
+        devices,
+        arcStatus: "offline",
+        lastCheck: "Just now",
+        note: "Jemm Arc heartbeat lost. Confirm power and the PoE drop.",
+      };
+    },
+    already(p) {
+      return (p.devices || []).some((d) => d.kind === "arc" && /heartbeat/i.test(d.diagnostic || ""));
+    },
+    deviceOf(p) {
+      return (p.devices || []).find((d) => d.kind === "arc") || null;
+    },
+  },
+];
+
+let liveWatch = { started: false, timers: [] };
+
+function stopLiveWatch() {
+  liveWatch.timers.forEach(clearTimeout);
+  liveWatch.timers = [];
+  liveWatch.started = false;
+}
+
+function startLiveWatch() {
+  if (liveWatch.started || !state.loggedIn) return;
+  liveWatch.started = true;
+  LIVE_WATCH_EVENTS.forEach((ev) => {
+    liveWatch.timers.push(setTimeout(() => fireLiveEvent(ev), ev.delay));
+  });
+}
+
+function fireLiveEvent(ev) {
+  if (!state.loggedIn || isWizardFlow()) return;
+  const p = liveProperties().find((x) => String(x.id) === String(ev.propertyId));
+  if (!p || isPendingSetup(p) || ev.already(p)) return;
+  if ((state.incidents || []).some((i) => i.id === ev.id)) return;
+  const next = ev.apply(p);
+  const device = ev.deviceOf(next);
+  const name = propertyName(next);
+  const current = currentPropertyRecord();
+  const onSite = current && String(current.id) === String(next.id);
+  const incident = {
+    id: ev.id,
+    propertyId: next.id,
+    kind: ev.kind,
+    deviceId: device?.id || "",
+    title: name,
+    body: next.note || ev.line(name),
+    when: "Just now",
+    unread: true,
+  };
+  const properties = liveProperties().map((x) => (String(x.id) === String(next.id) ? next : x));
+  const patch = {
+    properties,
+    incidents: [...(state.incidents || []), incident],
+    jemmAssist: {
+      incidentId: ev.id,
+      propertyId: next.id,
+      line: onSite
+        ? `${ev.kind === "power-outage" ? "Power just dropped here." : "Something just went wrong here."} ${ev.arrive(name, device)}`
+        : ev.line(name),
+      cta: onSite ? "Show me" : ev.cta,
+    },
+    notifyOpen: false,
+  };
+  if (onSite) {
+    patch.devices = structuredClone(next.devices || []);
+    patch.arcStatus = next.arcStatus || state.arcStatus;
+  }
+  if (state.jemmVisible === false) patch.jemmVisible = true;
+  if (normalizeJemmPlace(state.jemmPlace) === "side") patch.jemmSideOpen = true;
+  setState(patch);
+  if (state.loggedIn) persistSession();
+}
+
+function notifyItems() {
+  const items = [];
+  const seen = new Set();
+  (state.incidents || []).slice().reverse().forEach((inc) => {
+    seen.add(`${inc.propertyId}:device:${inc.deviceId}`);
+    seen.add(`${inc.propertyId}:${inc.kind}`);
+    seen.add(`${inc.propertyId}:arc`);
+    items.push({
+      action: "investigate-incident",
+      id: inc.id,
+      title: inc.title,
+      body: inc.body,
+      when: inc.when || "Just now",
+      unread: inc.unread !== false,
+    });
+  });
+  liveAlerts().forEach((a) => {
+    const key = `${a.id}:device:${a.deviceId || a.device}`;
+    if (seen.has(key) || seen.has(`${a.id}:power-outage`) || seen.has(`${a.id}:arc-offline`)) return;
+    seen.add(key);
+    items.push({
+      action: "open-alert",
+      id: a.id,
+      deviceId: a.deviceId || "",
+      title: a.name,
+      body: a.body,
+      when: "Open",
+      unread: true,
+    });
+  });
+  modeProperties().forEach((p) => {
+    if (isPendingSetup(p) || (p.arcStatus || "offline") === "online") return;
+    const key = `${p.id}:arc`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push({
+      action: "open-alert",
+      id: p.id,
+      title: propertyName(p),
+      body: "Jemm Arc is offline",
+      when: p.lastCheck || "Open",
+      unread: true,
+    });
+  });
+  return items;
+}
+
+function currentRoomTitle() {
+  const floor = (state.floors || [])[state.selectedFloor];
+  const room = floor?.rooms?.[state.selectedRoom];
+  return room ? roomName(room) : "";
+}
+
+function jemmContextLine() {
+  const house = state.property?.name || (currentLiveProperty() && propertyName(currentLiveProperty())) || "this property";
+  const room = currentRoomTitle();
+  const d = state.selectedDevice ? deviceView(findSheetDevice(state.selectedDevice)) : null;
+  if (d) {
+    if (deviceIsAlert(d)) return `${d.name} needs a look${d.room ? ` in ${d.room}` : ""}. I can ping it or open history.`;
+    if (d.kind === "arc") {
+      return state.arcStatus !== "online"
+        ? `Jemm Arc is offline at ${house}. Check power and the network drop.`
+        : `You’re in Jemm Arc details. Heartbeat looks ${state.arcStatus}.`;
+    }
+    if (d.kind === "mic") return `You’re in ${d.name}. I can ping it or tweak speaker volume.`;
+    return `You’re looking at ${d.name}. I can move it, ping it, or jump back to the plan.`;
+  }
+  if (state.screen === "rooms" && state.reviewing) {
+    if (state.arcStatus !== "online") return `Jemm Arc is offline at ${house}. Let’s confirm power and the drop.`;
+    if (state.roomsFilter === "alert") return `Showing rooms that need attention at ${house}. Pick one and I’ll stay with you.`;
+    if (room) return `You’re in ${room} at ${house}. I can open a device, run a scene, or check Arc.`;
+    return `You’re at ${house}. I can filter what needs attention, or open Jemm Arc.`;
+  }
+  if (state.screen === "dashboard") {
+    const n = notifyItems().length;
+    if (n) return `Home view. ${n} item${n === 1 ? "" : "s"} need attention across your properties. I can take you there.`;
+    return "You’re on Home. Open a property to work a site, or I’ll jump in if something goes down.";
+  }
+  if (state.screen === "clients") return "Client book. I can open a site or filter who needs attention.";
+  if (state.screen === "insights") return "Insights. I can jump to a property if health or bookings look off.";
+  if (state.screen === "settings" || state.screen === "profile") return "I’ll keep watching the fleet while you change settings.";
+  if (!state.reviewing) return guideText();
+  return "I’m here if you need a hand.";
+}
+
+function jemmAssistCta() {
+  const assist = state.jemmAssist;
+  if (!assist?.cta || !assist.incidentId) return "";
+  return `<button type="button" class="btn btn--next jemm-assist__btn" data-action="investigate-incident" data-id="${esc(assist.incidentId)}">${esc(assist.cta)}</button>`;
+}
+
+function investigateIncident(id) {
+  const ev = LIVE_WATCH_EVENTS.find((x) => x.id === id) || null;
+  const inc = (state.incidents || []).find((x) => String(x.id) === String(id));
+  const propertyId = inc?.propertyId || ev?.propertyId;
+  const p = liveProperties().find((x) => String(x.id) === String(propertyId));
+  if (!p) {
+    flashToast("Can’t open", "That property isn’t on this account.", "error");
+    return;
+  }
+  const script = ev || LIVE_WATCH_EVENTS.find((x) => x.propertyId === p.id);
+  const device = script ? script.deviceOf(p) : (p.devices || []).find((d) => String(d.id) === String(inc?.deviceId));
+  const mode = propertyMode(p);
+  persistMode(mode);
+  loadPropertyRecord(p);
+  const loc = floorRoomForDevice(device);
+  const assist = {
+    incidentId: id,
+    propertyId: p.id,
+    line: script ? script.arrive(propertyName(p), device) : `We’re at ${propertyName(p)}. I filtered to what needs attention.`,
+    cta: null,
+  };
+  setState({
+    screen: "rooms",
+    reviewing: true,
+    addingProperty: false,
+    portalMode: mode,
+    roomsFilter: "alert",
+    floorOverview: false,
+    selectedFloor: loc.selectedFloor,
+    selectedRoom: loc.selectedRoom,
+    selectedDevice: device?.id || null,
+    deviceSnapshot: device ? structuredClone(deviceView(device)) : null,
+    sheetAccord: { test: true, hardware: true, network: true },
+    notifyOpen: false,
+    modal: null,
+    coach: null,
+    incidents: (state.incidents || []).map((x) => (String(x.id) === String(id) ? { ...x, unread: false } : x)),
+    jemmAssist: assist,
+    ...patchForSheetNav(!!device),
+  });
+}
+
+function openAlertProperty(propertyId, deviceId) {
+  const p = liveProperties().find((x) => String(x.id) === String(propertyId));
+  if (!p) return;
+  const device = (p.devices || []).find((d) => String(d.id) === String(deviceId))
+    || ((p.arcStatus || "") !== "online" ? (p.devices || []).find((d) => d.kind === "arc") : null);
+  const mode = propertyMode(p);
+  persistMode(mode);
+  loadPropertyRecord(p);
+  const loc = floorRoomForDevice(device);
+  setState({
+    screen: "rooms",
+    reviewing: true,
+    addingProperty: false,
+    portalMode: mode,
+    roomsFilter: "alert",
+    floorOverview: false,
+    selectedFloor: loc.selectedFloor,
+    selectedRoom: loc.selectedRoom,
+    selectedDevice: device?.id || null,
+    deviceSnapshot: device ? structuredClone(deviceView(device)) : null,
+    sheetAccord: { test: true, hardware: true, network: true },
+    notifyOpen: false,
+    modal: null,
+    jemmAssist: {
+      incidentId: "",
+      propertyId: p.id,
+      line: `We’re at ${propertyName(p)}. I filtered to what needs attention.`,
+      cta: null,
+    },
+    ...patchForSheetNav(!!device),
+  });
+}
+
 function sheetRoomNames() {
   return (state.floors || []).flatMap((f) => (f.rooms || []).map(roomName));
 }
@@ -4633,15 +4985,15 @@ function topNav() {
         ${themeToggle()}
         ${app ? `
           <div class="notify-wrap" data-keep-menu>
-            <button type="button" class="nav-round" data-action="toggle-notify" aria-label="Notifications">
+            <button type="button" class="nav-round ${notifyItems().some((n) => n.unread) ? "is-hot" : ""}" data-action="toggle-notify" aria-label="Notifications">
               <img src="assets/nav/bell.svg" alt="" />
-              ${liveAlerts().length ? `<span class="nav-badge">${liveAlerts().length}</span>` : ""}
+              ${notifyItems().length ? `<span class="nav-badge">${notifyItems().length}</span>` : ""}
             </button>
             ${state.notifyOpen ? `
               <div class="nav-pop">
                 <strong>Notifications</strong>
-                ${liveAlerts().length
-                  ? liveAlerts().map((a) => `<button type="button" class="nav-pop__item" data-action="open-property" data-id="${esc(a.id)}"><b>${esc(a.name)}</b><span>${esc(a.body)}</span></button>`).join("")
+                ${notifyItems().length
+                  ? notifyItems().map((a) => `<button type="button" class="nav-pop__item ${a.unread ? "is-new" : ""}" data-action="${esc(a.action)}" data-id="${esc(a.id)}"${a.deviceId ? ` data-device="${esc(a.deviceId)}"` : ""}><b>${esc(a.title)}</b><span>${esc(a.body)}</span></button>`).join("")
                   : `<p>All properties look healthy. Jemm will ping you here if Arc or a device needs attention.</p>`}
               </div>` : ""}
           </div>
@@ -4659,7 +5011,7 @@ function jemmDock() {
   return `
     <aside class="jemm-dock">
       <div class="jemm-dock__avatar"><img src="assets/jemm-face.png" alt="Jemm" /></div>
-      <p class="guide-text">${esc(guideText())}</p>
+      <p class="guide-text">${esc(helpstripLine() || guideText())}</p>
       <div class="jemm-dock__actions">
         ${isOnboarding() ? `<button type="button" class="btn btn--ghost" data-action="show-jemm">Show Jemm</button>` : ""}
         <button type="button" class="modal__x" data-action="toggle-jemm-dock" aria-label="Close">×</button>
@@ -4788,7 +5140,7 @@ function layout(inner, opts = {}) {
   const crumbs = crumbsBar();
   const cta = wizardFlow ? wizardCtaBar(prev, next, nextDisabled) : "";
   return `
-    <div class="shell ${landing ? "is-landing" : ""} ${wizardFlow ? "is-wizard has-cta" : ""} ${home ? "is-home" : ""} ${showAppNav() && state.sidebarOpen !== false && !wizardFlow ? "has-appnav" : ""} ${state.selectedDevice ? "has-sheet has-device-sheet" : ""} ${state.voiceMode ? "is-voice" : ""} ${showJemmRow() ? "has-strip" : ""} ${showPageJemm() && state.jemmPlace === "side" ? "has-jemm-side" : ""} ${jemmSideCompetes() ? "is-jemm-docked" : ""} ${jemmSideCompetes() && !state.jemmSideOpen ? "is-jemm-collapsed" : ""} ${jemmSideCompetes() && state.jemmSideOpen ? "is-jemm-side-open" : ""} ${crumbs ? "has-crumbs" : ""}">
+    <div class="shell ${landing ? "is-landing" : ""} ${wizardFlow ? "is-wizard has-cta" : ""} ${home ? "is-home" : ""} ${showAppNav() && state.sidebarOpen !== false && !wizardFlow ? "has-appnav" : ""} ${state.selectedDevice ? "has-sheet has-device-sheet" : ""} ${state.voiceMode ? "is-voice" : ""} ${showJemmRow() ? "has-strip" : ""} ${showJemmRow() && normalizeJemmPlace(state.jemmPlace) === "bottom" ? "is-jemm-bottom" : ""} ${showPageJemm() && state.jemmPlace === "side" ? "has-jemm-side" : ""} ${jemmSideCompetes() ? "is-jemm-docked" : ""} ${jemmSideCompetes() && !state.jemmSideOpen ? "is-jemm-collapsed" : ""} ${jemmSideCompetes() && state.jemmSideOpen ? "is-jemm-side-open" : ""} ${crumbs ? "has-crumbs" : ""}">
       ${sidebar()}
       ${landing ? "" : `<div class="page-wash" aria-hidden="true"></div>`}
       ${topNav()}
@@ -5123,10 +5475,11 @@ function diagnosticsModal() {
           <p>${issues.length ? `${issues.length} device${issues.length === 1 ? "" : "s"} ${issues.length === 1 ? "needs" : "need"} attention.` : "All devices on this property look healthy."}</p>
           <div class="diag-list">
             ${items.length ? items.map((d) => {
-              const alert = deviceIsAlert(d);
+              const updating = deviceIsUpdating(d);
+              const alert = !updating && deviceIsAlert(d);
               return `
-                <button type="button" class="diag-row ${alert ? "is-alert" : "is-ok"}" data-action="open-device" data-id="${esc(d.id)}">
-                  <span class="device-rail__status ${alert ? "is-alert" : "is-ok"}" aria-hidden="true"></span>
+                <button type="button" class="diag-row ${updating ? "is-updating" : alert ? "is-alert" : "is-ok"}" data-action="open-device" data-id="${esc(d.id)}">
+                  <span class="device-rail__status ${updating ? "is-updating" : alert ? "is-alert" : "is-ok"}" aria-hidden="true"></span>
                   <span class="diag-row__copy">
                     <strong>${esc(d.name)}</strong>
                     <em>${esc(d.room || "Unassigned")} · ${esc(deviceStatusLabel(d))}</em>
@@ -5195,32 +5548,35 @@ function devicePulsePoints(d, beat = 0) {
 
 function deviceDiagMeta(d) {
   const seed = deviceSeed(d);
-  const alert = deviceIsAlert(d);
-  const off = d?.on === false;
+  const updating = deviceIsUpdating(d);
+  const alert = !updating && deviceIsAlert(d);
+  const off = !updating && d?.on === false;
   return {
-    beat: alert ? "Dropped" : off ? "Idle" : `${(1.1 + (seed % 9) / 10).toFixed(1)}s`,
-    signal: alert ? "Weak" : off ? "Standby" : `−${38 + (seed % 18)} dBm`,
-    load: alert ? "—" : `${8 + (seed % 22)}%`,
+    beat: updating ? "Syncing" : alert ? "Dropped" : off ? "Idle" : `${(1.1 + (seed % 9) / 10).toFixed(1)}s`,
+    signal: updating ? "Updating" : alert ? "Weak" : off ? "Standby" : `−${38 + (seed % 18)} dBm`,
+    load: updating ? "—" : alert ? "—" : `${8 + (seed % 22)}%`,
   };
 }
 
 function sheetDiagHtml(d) {
-  const alert = deviceIsAlert(d);
+  const updating = deviceIsUpdating(d);
+  const alert = !updating && deviceIsAlert(d);
   const status = sheetStatus(d);
   const meta = deviceDiagMeta(d);
   const bars = Array.from({ length: 18 }, (_, i) => `<i style="--i:${i}"></i>`).join("");
   const history = !sheetShowsPower(d);
+  const graphClass = updating ? "is-updating" : alert ? "is-alert" : d.on === false ? "is-idle" : "";
   return `
-    <section class="sheet-diag ${alert ? "is-alert" : ""}">
+    <section class="sheet-diag ${alert ? "is-alert" : ""} ${updating ? "is-updating" : ""}">
       <div class="sheet-diag__head">
         <h3>Status</h3>
-        <span class="status-dot ${status.ok ? "" : "status-dot--alert"}"><i></i>${esc(status.label)}</span>
+        <span class="status-dot ${updating ? "status-dot--updating" : status.ok ? "" : "status-dot--alert"}"><i></i>${esc(status.label)}</span>
         ${history ? `
           <button type="button" class="icon-btn icon-btn--link" data-action="device-history" data-icon="history" aria-label="Device history">
             <span class="icon-btn__glyph" aria-hidden="true"></span>
           </button>` : ""}
       </div>
-      <div class="sheet-diag__graph ${alert ? "is-alert" : d.on === false ? "is-idle" : ""}" aria-hidden="true">
+      <div class="sheet-diag__graph ${graphClass}" aria-hidden="true">
         <svg viewBox="0 0 245 56" preserveAspectRatio="none">
           <polyline data-diag-line points="${devicePulsePoints(d, 0)}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
         </svg>
@@ -5231,7 +5587,10 @@ function sheetDiagHtml(d) {
         <div><span>Signal</span><strong>${esc(meta.signal)}</strong></div>
         <div><span>Load</span><strong>${esc(meta.load)}</strong></div>
       </div>
-      <button type="button" class="btn btn--ghost btn--wide" data-action="reset-device">Reset device</button>
+      <div class="sheet-diag__actions">
+        <button type="button" class="btn btn--ghost" data-action="reset-device">Reset</button>
+        <button type="button" class="btn btn--secondary" data-action="update-device" ${updating ? "disabled" : ""}>${updating ? "Updating…" : "Update"}</button>
+      </div>
     </section>`;
 }
 
@@ -5430,6 +5789,7 @@ function deviceCard(d, view) {
 }
 
 function sheetStatus(d) {
+  if (deviceIsUpdating(d)) return { ok: true, label: "Updating" };
   if (deviceIsAlert(d)) {
     const label = /off/i.test(String(d.diagnostic || "")) || d.on === false ? "Offline" : (d.diagnostic || "Error");
     return { ok: false, label };
@@ -5709,7 +6069,7 @@ function deviceSheet() {
   const heroKind = sheetHeroKind(d);
   return `
     <aside class="sheet sheet--device ${state.flashingDevice === d.id ? "is-flashing" : ""}" role="dialog" aria-labelledby="sheet-device-name" style="--sheet-hero: 0">
-      <div class="sheet-glow ${jemm ? "is-jemm" : ""}" aria-hidden="true"></div>
+      <div class="sheet-glow" aria-hidden="true"></div>
       <header class="sheet__head sheet__head--device">
         <span class="sheet-head__collapsed">${esc(d.name)}</span>
         <button type="button" class="modal__x" data-action="close-sheet" aria-label="Close">×</button>
@@ -5883,13 +6243,8 @@ function helpstripLine() {
     const copy = coachCopy();
     if (copy?.strip) return copy.strip;
   }
-  if (state.reviewing) return "I’m here if you need a hand.";
-  if (state.screen === "dashboard" || state.screen === "clients" || state.screen === "insights") return "";
-  if (state.screen === "arc") {
-    if (state.arcStatus === "online") return "Arc is online. Next is rooms.";
-    if (state.arcStatus === "connecting") return "Connecting Arc to the network.";
-  }
-  return "";
+  if (state.jemmAssist?.line) return state.jemmAssist.line;
+  return jemmContextLine();
 }
 
 function jemmSpeakLine() {
@@ -5898,13 +6253,15 @@ function jemmSpeakLine() {
 }
 
 function jemmStrip(line) {
+  const cta = jemmAssistCta();
   return `
-    <div class="jemm-strip ${state.voiceMode ? "is-listening" : ""} ${line ? "" : "is-quiet"}">
+    <div class="jemm-strip ${state.voiceMode ? "is-listening" : ""} ${line || cta ? "" : "is-quiet"} ${state.jemmAssist?.cta ? "is-assist" : ""}">
       ${jemmOrb("jemm-orb--strip")}
       <div class="jemm-strip__copy">
         ${line ? `<p class="jemm-strip__line jemm-line" data-jemm-speak data-line="${esc(line)}" aria-live="polite"></p>` : ""}
         <p class="jemm-strip__heard" data-jemm-caption ${state.voiceHeard ? "" : "hidden"}>${state.voiceHeard ? `You: ${esc(state.voiceHeard)}` : ""}</p>
       </div>
+      ${cta}
       <button type="button" class="jemm-strip__mic ${state.voiceMode ? "is-live" : ""}" data-action="toggle-voice" aria-label="${state.voiceMode ? "Stop listening" : "Talk to Jemm"}">
         <img src="assets/nav/mic.svg" alt="" />
       </button>
@@ -5913,25 +6270,28 @@ function jemmStrip(line) {
 
 function jemmSide() {
   const line = helpstripLine();
+  const cta = jemmAssistCta();
   const docked = jemmSideCompetes();
   const collapsed = docked && !state.jemmSideOpen;
   const opened = docked && state.jemmSideOpen;
+  const alert = !!(state.jemmAssist?.cta);
   if (collapsed) {
     return `
-      <aside class="jemm-side is-collapsed ${state.voiceMode ? "is-live" : ""}" aria-label="Jemm">
-        <button type="button" class="jemm-side__icon ${state.voiceMode ? "is-live" : ""}" data-action="toggle-jemm-side" aria-expanded="false" aria-label="Open Jemm">
+      <aside class="jemm-side is-collapsed ${state.voiceMode ? "is-live" : ""} ${alert ? "is-alert" : ""}" aria-label="Jemm">
+        <button type="button" class="jemm-side__icon ${state.voiceMode ? "is-live" : ""} ${alert ? "is-alert" : ""}" data-action="toggle-jemm-side" aria-expanded="false" aria-label="Open Jemm">
           <img src="assets/nav/jemm.png" alt="" />
         </button>
       </aside>`;
   }
   return `
-    <aside class="jemm-side ${opened ? "is-open" : ""}" aria-label="Jemm">
+    <aside class="jemm-side ${opened ? "is-open" : ""} ${alert ? "is-alert" : ""}" aria-label="Jemm">
       ${opened ? `<button type="button" class="jemm-side__collapse" data-action="toggle-jemm-side" aria-expanded="true" aria-label="Collapse Jemm"><img src="assets/nav/chevron.svg" alt="" /></button>` : ""}
       <div class="jemm-side__hero">
         ${jemmOrb("jemm-orb--side")}
         <p class="jemm-side__name">Jemm</p>
         <p class="jemm-side__line jemm-line" data-jemm-speak data-line="${esc(line)}" aria-live="polite"></p>
         <p class="jemm-side__heard" data-jemm-caption ${state.voiceHeard ? "" : "hidden"}>${state.voiceHeard ? `You: ${esc(state.voiceHeard)}` : ""}</p>
+        ${cta}
       </div>
       <button type="button" class="jemm-strip__mic jemm-side__mic ${state.voiceMode ? "is-live" : ""}" data-action="toggle-voice" aria-label="${state.voiceMode ? "Stop listening" : "Talk to Jemm"}">
         <img src="assets/nav/mic.svg" alt="" />
@@ -6449,26 +6809,26 @@ function propertyCard() {
       <div class="prop-hero__cover${cover ? " has-photo" : ""}">
         ${cover ? `<img src="${esc(cover)}" alt="" />` : ""}
         <div class="prop-hero__cover-row">
-          <h2 class="prop-hero__title">${esc(name)}</h2>
-          <div class="prop-hero__tools">
+          <div class="prop-hero__heading">
+            <h2 class="prop-hero__title">${esc(name)}</h2>
             ${weatherChipHtml()}
-            <div class="prop-hero__actions">
-              <button type="button" class="prop-hero__profiles" data-action="view-profiles" aria-label="View profiles">
-                <img src="assets/icon-fingerprint.svg" alt="" />
-                Profiles
-              </button>
-              <button type="button" class="prop-hero__profiles" data-action="view-scenes" data-coach="scenes" aria-label="View scenes">
-                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor"/></svg>
-                Scenes
-              </button>
-              <button type="button" class="prop-hero__profiles" data-action="view-jemm-arc" aria-label="View Jemm Arc">
-                <img src="assets/icon-arc.svg" alt="" />
-                View Jemm Arc
-              </button>
-              <button type="button" class="prop-hero__edit" data-action="edit-property" aria-label="Edit property details">
-                <img src="assets/icon-pencil.svg" alt="" />
-              </button>
-            </div>
+          </div>
+          <div class="prop-hero__actions">
+            <button type="button" class="prop-hero__profiles" data-action="view-profiles" aria-label="View profiles">
+              <img src="assets/icon-fingerprint.svg" alt="" />
+              Profiles
+            </button>
+            <button type="button" class="prop-hero__profiles" data-action="view-scenes" data-coach="scenes" aria-label="View scenes">
+              <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.55"/><rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor"/></svg>
+              Scenes
+            </button>
+            <button type="button" class="prop-hero__profiles" data-action="view-jemm-arc" aria-label="Jemm Arc">
+              <img src="assets/icon-arc.svg" alt="" />
+              Jemm Arc
+            </button>
+            <button type="button" class="prop-hero__edit" data-action="edit-property" aria-label="Edit property details">
+              <img src="assets/icon-pencil.svg" alt="" />
+            </button>
           </div>
         </div>
       </div>
@@ -7796,7 +8156,7 @@ function paintDeviceDiag() {
   if (!d) return;
   line.setAttribute("points", devicePulsePoints(d, diagBeat));
   const beat = document.querySelector("[data-diag-beat]");
-  if (beat && !deviceIsAlert(d) && d.on !== false) {
+  if (beat && !deviceIsUpdating(d) && !deviceIsAlert(d) && d.on !== false) {
     const n = 1.05 + ((diagBeat + deviceSeed(d)) % 9) / 20;
     beat.textContent = `${n.toFixed(1)}s`;
   }
@@ -7871,6 +8231,7 @@ function render() {
   }
   if (state.jemmVideo) playJemmHome();
   if (state.modal === "jemm-save") playJemmSave();
+  if (state.loggedIn) startLiveWatch();
   if (state.selectedDevice) startDiagPulse();
   else stopDiagPulse();
   syncVoiceEngine();
@@ -7929,82 +8290,53 @@ function bindRoomsPin() {
   update();
 }
 
+let sheetHeroCtl = null;
+
 function bindSheetHeroScale() {
+  sheetHeroCtl?.abort();
   const sheet = document.querySelector(".sheet--device");
   const body = sheet?.querySelector("[data-sheet-scroll]") || sheet?.querySelector(".sheet__body");
   if (!sheet || !body) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let ticking = false;
-  let pull = 0;
-  let decayId = 0;
-  let touchY = null;
-  const maxPull = 160;
-  const apply = () => {
-    ticking = false;
-    if (reduce) {
-      sheet.style.setProperty("--sheet-hero", "0");
-      sheet.classList.remove("is-scrolled");
-      return;
-    }
+  if (reduce) {
+    sheet.style.setProperty("--sheet-hero", "0");
+    sheet.classList.remove("is-scrolled");
+    return;
+  }
+  sheetHeroCtl = new AbortController();
+  const { signal } = sheetHeroCtl;
+  let current = Number(sheet.style.getPropertyValue("--sheet-hero")) || 0;
+  let target = 0;
+  let raf = 0;
+  const readTarget = () => {
     const art = sheet.querySelector(".sheet-hero__art");
-    const span = Math.max(200, Math.round((art?.offsetHeight || 240) * 0.85));
-    const y = body.scrollTop;
-    if (y > 1) pull = 0;
-    let t;
-    if (y < 0) t = Math.max(-0.65, y / span);
-    else if (y > 0) t = Math.min(1, y / span);
-    else t = Math.max(-0.65, -pull / span);
-    sheet.style.setProperty("--sheet-hero", t.toFixed(4));
-    sheet.classList.toggle("is-scrolled", t > 0.08);
+    const span = Math.max(220, Math.round((art?.offsetHeight || 240) * 1.15));
+    const y = Math.max(0, body.scrollTop);
+    return Math.min(1, y / span);
   };
-  const requestApply = () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(apply);
+  const tick = () => {
+    raf = 0;
+    target = readTarget();
+    const delta = target - current;
+    if (Math.abs(delta) < 0.003) current = target;
+    else current += delta * 0.22;
+    sheet.style.setProperty("--sheet-hero", current.toFixed(4));
+    sheet.classList.toggle("is-scrolled", current > 0.08);
+    if (current !== target) raf = requestAnimationFrame(tick);
   };
-  const decayPull = () => {
-    decayId = 0;
-    if (body.scrollTop > 0 || pull <= 0.4) {
-      pull = 0;
-      apply();
-      return;
-    }
-    pull *= 0.86;
-    apply();
-    if (pull > 0.4) decayId = requestAnimationFrame(decayPull);
+  const requestTick = () => {
+    if (!raf) raf = requestAnimationFrame(tick);
   };
-  const startDecay = () => {
-    if (decayId) cancelAnimationFrame(decayId);
-    decayId = requestAnimationFrame(decayPull);
-  };
-  body.addEventListener("scroll", requestApply, { passive: true });
-  body.addEventListener("wheel", (e) => {
-    if (body.scrollTop > 0 || e.deltaY >= 0) return;
-    pull = Math.min(maxPull, pull - e.deltaY * 0.45);
-    if (decayId) cancelAnimationFrame(decayId);
-    requestApply();
-    startDecay();
-  }, { passive: true });
-  body.addEventListener("touchstart", (e) => {
-    touchY = e.touches[0].clientY;
-  }, { passive: true });
-  body.addEventListener("touchmove", (e) => {
-    if (touchY == null) return;
-    const dy = e.touches[0].clientY - touchY;
-    if (body.scrollTop <= 0 && dy > 0) {
-      pull = Math.min(maxPull, dy * 0.55);
-      requestApply();
-    }
-  }, { passive: true });
-  body.addEventListener("touchend", () => {
-    touchY = null;
-    startDecay();
-  }, { passive: true });
-  apply();
+  body.addEventListener("scroll", requestTick, { passive: true, signal });
+  signal.addEventListener("abort", () => {
+    if (raf) cancelAnimationFrame(raf);
+  });
+  requestTick();
 }
 
 function logout() {
   stopJemmListen();
+  stopLiveWatch();
   localStorage.removeItem(SESSION_KEY);
   const theme = state.theme;
   state = blankState();
@@ -8251,7 +8583,10 @@ document.addEventListener("click", (e) => {
     const field = action.dataset.field;
     const value = action.dataset.value;
     const patch = {};
-    if (scope === "rooms") patch.roomsFilter = value;
+    if (scope === "rooms") {
+      patch.roomsFilter = value;
+      if (value !== "alert" && state.jemmAssist && !state.jemmAssist.cta) patch.jemmAssist = null;
+    }
     if (scope === "home" && field === "status") patch.homeFilter = value;
     if (scope === "home" && field === "updated") patch.homeUpdated = value;
     if (scope === "clients" && field === "status") patch.clientFilter = value;
@@ -8396,6 +8731,14 @@ document.addEventListener("click", (e) => {
     const scenes = ensurePropertyScenes();
     const current = findScene(state.selectedScene);
     setState({ modal: "scene", selectedScene: current?.id || scenes[0]?.id || null, scenes });
+    return;
+  }
+  if (act === "investigate-incident") {
+    investigateIncident(action.dataset.id);
+    return;
+  }
+  if (act === "open-alert") {
+    openAlertProperty(action.dataset.id, action.dataset.device);
     return;
   }
   if (act === "view-jemm-arc") {
@@ -8705,9 +9048,26 @@ document.addEventListener("click", (e) => {
     if (!raw) return;
     const patch = mutateDevice(id, { diagnostic: "Healthy", offline: false, on: true });
     const snap = state.deviceSnapshot ? { ...state.deviceSnapshot, diagnostic: "Healthy", offline: false, on: true } : state.deviceSnapshot;
-    setState({ ...patch, deviceSnapshot: snap });
+    setState({ ...patch, deviceSnapshot: snap, updatingDevice: null });
     if (state.loggedIn) persistSession();
     flashToast("Reset sent", `${raw.name} is reconnecting. Diagnostics look healthy.`);
+    return;
+  }
+  if (act === "update-device") {
+    const id = state.selectedDevice;
+    const raw = findSheetDevice(id);
+    if (!raw || deviceIsUpdating(raw)) return;
+    setState({ updatingDevice: id });
+    later(() => {
+      if (String(state.updatingDevice) !== String(id)) return;
+      const cur = findSheetDevice(id);
+      const nextFw = bumpFirmware(cur?.firmware);
+      const patch = mutateDevice(id, { firmware: nextFw });
+      const snap = state.deviceSnapshot ? { ...state.deviceSnapshot, firmware: nextFw } : state.deviceSnapshot;
+      setState({ ...patch, deviceSnapshot: snap, updatingDevice: null });
+      if (state.loggedIn) persistSession();
+      flashToast("Update complete", `${raw.name} is on firmware ${nextFw}.`);
+    }, 2400);
     return;
   }
   if (act === "device-kelvin") {
